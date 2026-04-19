@@ -16,20 +16,26 @@
 
 ## 前置要求
 
-- macOS（Apple Silicon 构建，Intel Mac 需自行编译）
-- [Node 20+](https://nodejs.org) + [pnpm](https://pnpm.io)
-- [Rust stable](https://rustup.rs) + Xcode Command Line Tools
+- macOS（aarch64 / x86_64 均有预构建）
+- **下 DMG**：无额外依赖，直接用
+- **源码 build**：[Node 20+](https://nodejs.org) + [pnpm](https://pnpm.io) + [Rust stable](https://rustup.rs) + Xcode Command Line Tools
 
 ## 快速开始
 
-**Ink 是源码项目**——不做 Apple Developer ID 签名（$99/年对这种小工具性价比低），自己 clone + build：
+**下载预构建 DMG（推荐，< 1 分钟）** · GitHub Actions 自动 build aarch64 + x86_64 DMG：
+
+→ [**Latest Release**](https://github.com/LinekForge/ink/releases/latest)（选对应架构的 DMG）
+
+Ink **不做** Apple Developer ID 签名（$99/年对这种小工具性价比低），所有 DMG 都 unsigned。
+
+**或从源码 build**（想 customize / 审代码）：
 
 ```bash
 git clone https://github.com/LinekForge/ink.git
 cd ink
 pnpm install
 pnpm tauri build
-open src-tauri/target/release/bundle/dmg/Ink_0.2.1_aarch64.dmg
+open src-tauri/target/release/bundle/dmg/Ink_0.2.2_aarch64.dmg
 # 拖 Ink.app 到 Applications
 ```
 
@@ -76,7 +82,7 @@ open src-tauri/target/release/bundle/dmg/Ink_0.2.1_aarch64.dmg
 
 | 限制 | 原因 |
 |------|------|
-| 仅 macOS Apple Silicon 预构建 | Tauri 支持 Windows / Linux / Intel，未测试 |
+| 仅 macOS（aarch64 + x86_64） | Tauri 支持 Windows / Linux，未测试 |
 | Unsigned DMG | 源码项目定位，不走 Apple Developer ID 签名 + notarize |
 | 无 Mermaid / KaTeX 渲染 | Roadmap |
 | 无 PDF / HTML 导出 | 暂用系统「打印 → 另存为 PDF」过渡 |
@@ -128,7 +134,7 @@ pnpm tauri dev
 
 # 打包 DMG（Apple Silicon）
 pnpm tauri build
-# 输出：src-tauri/target/release/bundle/dmg/Ink_0.2.1_aarch64.dmg
+# 输出：src-tauri/target/release/bundle/dmg/Ink_0.2.2_aarch64.dmg
 
 # 类型检查
 pnpm exec tsc --noEmit
