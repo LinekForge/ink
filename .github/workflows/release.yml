@@ -11,6 +11,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write  # tauri-action 要 create release + upload assets
+
 jobs:
   build:
     strategy:
