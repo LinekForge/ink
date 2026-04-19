@@ -5,13 +5,13 @@
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Apple%20Silicon%20%2B%20Intel-lightgrey.svg)
 ![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24C8DB.svg)
 
-**让 Markdown 看起来就像它该有的样子**——打开 md，眼睛不累；想改一个字，光标点过去改就行。< 10 MB，原生体感，macOS only。
+**让 Markdown 看起来就像它该有的样子**——打开 md，眼睛不累；想改一个字，光标点过去改就行。
 
 - **WYSIWYG** — Milkdown 渲染后就是最终样子，点哪改哪，不分左源右预览
 - **GFM 全套** — Callout 5 类 · Task list 可点击 · 代码块 Prism 高亮 · 图片粘贴即存
 - **阅读沉浸** — 聚焦模式（`⌘⇧L`）当前小节清晰、其他 dim · Zen 模式（`⌘⇧↵`）剥离全部 UI · 图片单击 Lightbox 全屏
 - **长文导航** — 文档大纲（`⌘⇧O`）滚动时自动高亮当前节 · 文档内搜索（`⌘F`）带 N / M 计数
-- **极轻** — < 10 MB app bundle（对比 Electron 的 150 MB+），Rust + Web 混合，原生体感
+- **极轻原生** — < 10 MB app bundle（对比 Electron 的 150 MB+），Rust + Web 混合
 
 基于 [Tauri 2](https://tauri.app)（Rust 后端 + Web 前端）+ [Milkdown 7](https://milkdown.dev)（ProseMirror-based WYSIWYG）+ React 19。
 
@@ -88,16 +88,15 @@ open src-tauri/target/release/bundle/dmg/Ink_0.2.2_aarch64.dmg
 | 无 Mermaid / KaTeX 渲染 | Roadmap |
 | 无 PDF / HTML 导出 | 暂用系统「打印 → 另存为 PDF」过渡 |
 | 外部 reload 会跳顶 | cursor + 滚动位置保留待实现 |
-| 仅左右分栏 | 上下分栏 / 三栏以上永远不做（阅读器不是 IDE） |
 
 ## 不做的
 
 - 文件管理器 / workspace 概念——Ink 不是 IDE
 - 云同步 / 插件系统 / 全局跨文件搜索
-- 复杂的分栏嵌套
+- 上下分栏 / 三栏以上 / 嵌套分栏——永远不做
 
 > [!IMPORTANT]
-> 「**只做一件事做好**」是 Ink 的 core principle。md 阅读 + 顺手编辑 = 全部范围。想做更多的请用 Obsidian / VS Code。
+> 「**只做一件事做好**」是 Ink 的核心原则。md 阅读 + 顺手编辑 = 全部范围。想做更多的请用 Obsidian / VS Code。
 
 <details>
 <summary><strong>架构</strong></summary>
