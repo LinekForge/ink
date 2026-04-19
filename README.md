@@ -46,8 +46,8 @@ open src-tauri/target/release/bundle/dmg/Ink_0.2.2_aarch64.dmg
 > [!TIP]
 > 想用但不想自己装？把这个 GitHub 链接发给 Claude Code / Cursor / 任何能读 README + 跑 shell 的 agent——它会照上面的步骤装起来。
 
-> [!TIP]
-> **国内用户**：编译时 crates.io 下载超时，可以配置国内镜像：
+> [!TIP] 国内用户
+> 编译时 crates.io 下载超时，可以配置国内镜像：
 >
 > ```bash
 > # ~/.cargo/config.toml
