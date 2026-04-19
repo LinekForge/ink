@@ -1,9 +1,12 @@
 name: Release · auto-build macOS DMG
 
 # Tag push (v*) 或手动触发。
-# 无任何 untrusted input（无 issue/PR body/title/comment/commit message 解析）——
-# 只用 github.ref_name（tag 名，maintainer 控制）+ matrix.* （config）。
-# 无 command injection 面。
+# 无 untrusted input——只用 github.ref_name + matrix.*，无 injection 面。
+#
+# 单 runner (macos-14 · arm64) cross-compile 两个 target：
+# - aarch64-apple-darwin (Apple Silicon native)
+# - x86_64-apple-darwin (Intel via cross-compile)
+# 避开 macos-13 runner 供应不稳的问题（free tier 经常排队 30+ 分钟）。
 
 on:
   push:
@@ -12,19 +15,17 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write  # tauri-action 要 create release + upload assets
+  contents: write
 
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: macos-14
-            target: aarch64-apple-darwin
-          - os: macos-13
-            target: x86_64-apple-darwin
-    runs-on: ${{ matrix.os }}
+        target:
+          - aarch64-apple-darwin
+          - x86_64-apple-darwin
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
 
@@ -44,6 +45,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./src-tauri -> target
+          key: ${{ matrix.target }}
 
       - run: pnpm install
 
