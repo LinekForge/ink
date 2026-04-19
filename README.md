@@ -29,7 +29,7 @@ git clone https://github.com/LinekForge/ink.git
 cd ink
 pnpm install
 pnpm tauri build
-open src-tauri/target/release/bundle/dmg/Ink_0.2.0_aarch64.dmg
+open src-tauri/target/release/bundle/dmg/Ink_0.2.1_aarch64.dmg
 # 拖 Ink.app 到 Applications
 ```
 
@@ -113,7 +113,7 @@ pnpm tauri dev
 
 # 打包 DMG（Apple Silicon）
 pnpm tauri build
-# 输出：src-tauri/target/release/bundle/dmg/Ink_0.2.0_aarch64.dmg
+# 输出：src-tauri/target/release/bundle/dmg/Ink_0.2.1_aarch64.dmg
 
 # 类型检查
 pnpm exec tsc --noEmit

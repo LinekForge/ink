@@ -1,4 +1,6 @@
+import { useEffect, useRef, useState } from 'react'
 import { useWorkspace } from '../store/workspace'
+import { useFile } from '../hooks/useFile'
 
 type Props = {
   paneIndex: number
@@ -7,6 +9,7 @@ type Props = {
 /**
  * TabBar —— 顶部一排页签。Each pane has its own TabBar.
  * Active: 下有 accent 横线。Dirty: 前缀 ●。Hover 显示 ×。
+ * "+" 点击弹 popover 让用户选"新建空白 / 打开文件..."，不默认新建。
  */
 export function TabBar({ paneIndex }: Props) {
   const pane = useWorkspace((s) => s.panes[paneIndex])
@@ -18,6 +21,38 @@ export function TabBar({ paneIndex }: Props) {
   const newEmptyTab = useWorkspace((s) => s.newEmptyTab)
   const reorderTabs = useWorkspace((s) => s.reorderTabs)
   const panes = useWorkspace((s) => s.panes)
+  const { openFileDialog } = useFile()
+
+  // + popover state · 位置 fixed（父 TabBar 的 overflow-x-auto 会裁 y，不能用 absolute）
+  const [plusMenuPos, setPlusMenuPos] = useState<{
+    top: number
+    left: number
+  } | null>(null)
+  const plusBtnRef = useRef<HTMLButtonElement | null>(null)
+  const plusMenuRef = useRef<HTMLDivElement | null>(null)
+
+  // 点击外部 / Esc 关闭 popover
+  useEffect(() => {
+    if (!plusMenuPos) return
+    const onClick = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (
+        !plusMenuRef.current?.contains(t) &&
+        !plusBtnRef.current?.contains(t)
+      ) {
+        setPlusMenuPos(null)
+      }
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPlusMenuPos(null)
+    }
+    document.addEventListener('mousedown', onClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [plusMenuPos])
 
   if (!pane) return null
   const paneActive = paneIndex === activePaneIndex
@@ -122,14 +157,29 @@ export function TabBar({ paneIndex }: Props) {
         )
       })}
 
-      {/* "+" new tab */}
+      {/* "+" 按钮 · 点击弹 popover（位置 fixed 到 body，避父级 overflow 裁切）*/}
       <button
+        ref={plusBtnRef}
         onClick={(e) => {
           e.stopPropagation()
-          newEmptyTab(paneIndex)
+          setActivePane(paneIndex)
+          if (plusMenuPos) {
+            setPlusMenuPos(null)
+          } else {
+            const rect = (
+              e.currentTarget as HTMLElement
+            ).getBoundingClientRect()
+            setPlusMenuPos({ top: rect.bottom + 4, left: rect.left })
+          }
         }}
-        className="px-3 border-r border-[color:var(--ink-border)] text-[color:var(--ink-muted)] hover:text-[color:var(--ink-fg)] hover:bg-[color:var(--ink-border)]/40 transition-colors text-sm"
-        title="新建页签 (⌘T)"
+        className={`px-3 border-r border-[color:var(--ink-border)] transition-colors text-sm ${
+          plusMenuPos
+            ? 'bg-[color:var(--ink-border)]/40 text-[color:var(--ink-fg)]'
+            : 'text-[color:var(--ink-muted)] hover:text-[color:var(--ink-fg)] hover:bg-[color:var(--ink-border)]/40'
+        }`}
+        title="新建或打开"
+        aria-haspopup="menu"
+        aria-expanded={!!plusMenuPos}
       >
         +
       </button>
@@ -148,6 +198,40 @@ export function TabBar({ paneIndex }: Props) {
         >
           ✕
         </button>
+      )}
+
+      {/* + popover · fixed 定位逃出父级 overflow 裁切 */}
+      {plusMenuPos && (
+        <div
+          ref={plusMenuRef}
+          role="menu"
+          className="fixed z-50 min-w-[180px] bg-[color:var(--ink-bg)] border border-[color:var(--ink-border)] rounded-md shadow-lg py-1 text-xs"
+          style={{ top: plusMenuPos.top, left: plusMenuPos.left }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            role="menuitem"
+            onClick={() => {
+              setPlusMenuPos(null)
+              newEmptyTab(paneIndex)
+            }}
+            className="w-full flex items-center justify-between gap-4 px-3 py-1.5 hover:bg-[color:var(--ink-border)]/50 text-left text-[color:var(--ink-fg)]"
+          >
+            <span>新建空白</span>
+            <span className="text-[10px] text-[color:var(--ink-muted)]">⌘T</span>
+          </button>
+          <button
+            role="menuitem"
+            onClick={async () => {
+              setPlusMenuPos(null)
+              await openFileDialog()
+            }}
+            className="w-full flex items-center justify-between gap-4 px-3 py-1.5 hover:bg-[color:var(--ink-border)]/50 text-left text-[color:var(--ink-fg)]"
+          >
+            <span>打开文件...</span>
+            <span className="text-[10px] text-[color:var(--ink-muted)]">⌘O</span>
+          </button>
+        </div>
       )}
     </div>
   )
