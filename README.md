@@ -1,7 +1,8 @@
 # Ink · 墨
 
+[![Latest Release](https://img.shields.io/github/v/release/LinekForge/ink?label=download&color=24C8DB)](https://github.com/LinekForge/ink/releases/latest)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Apple%20Silicon-lightgrey.svg)
+![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Apple%20Silicon%20%2B%20Intel-lightgrey.svg)
 ![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24C8DB.svg)
 
 **让 Markdown 看起来就像它该有的样子**——打开 md，眼睛不累；想改一个字，光标点过去改就行。< 10 MB，原生体感，macOS only。
