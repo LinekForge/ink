@@ -1,0 +1,58 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Ink",
+  "version": "0.2.0",
+  "identifier": "live.linek.ink",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Ink",
+        "width": 1100,
+        "height": 750,
+        "minWidth": 480,
+        "minHeight": 360,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "backgroundColor": "#fafafa"
+      }
+    ],
+    "macOSPrivateApi": true,
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$HOME/**", "/Volumes/**", "/tmp/**"]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "dmg",
+    "category": "public.app-category.productivity",
+    "publisher": "LinekForge",
+    "copyright": "© 2026 Linek & Forge",
+    "shortDescription": "Markdown reader/editor built for humans working with AI agents",
+    "longDescription": "Ink is a minimal, elegant Markdown reader and light editor. Open .md files, read beautifully, edit when needed, split-view two files side by side, jump through long docs via TOC.",
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown", "mdx"],
+        "name": "Markdown Document",
+        "role": "Editor"
+      }
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
