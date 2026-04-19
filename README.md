@@ -39,6 +39,20 @@ open src-tauri/target/release/bundle/dmg/Ink_0.2.1_aarch64.dmg
 > [!TIP]
 > 想用但不想自己装？把这个 GitHub 链接发给 Claude Code / Cursor / 任何能读 README + 跑 shell 的 agent——它会照上面的步骤装起来。
 
+> **国内用户提示**：编译时 crates.io 下载超时，可以配置国内镜像：
+>
+> ```bash
+> # ~/.cargo/config.toml
+> [source.crates-io]
+> replace-with = "rsproxy"
+>
+> [source.rsproxy]
+> registry = "https://rsproxy.cn/crates.io-index"
+>
+> [registries.rsproxy]
+> index = "https://rsproxy.cn/crates.io-index"
+> ```
+
 ## 打开 md 的姿势
 
 - Finder 双击 `.md` / `.markdown` / `.mdx`
