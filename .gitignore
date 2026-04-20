@@ -1,0 +1,40 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Rust / Tauri build artifacts
+src-tauri/target/
+src-tauri/gen/schemas/
+*.dmg
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# 本项目的 archive（build artifact 副本）
+归档/
+
+# Ship 参数（push 时贴给 gh CLI 参考，不入 repo）
+SHIP.md

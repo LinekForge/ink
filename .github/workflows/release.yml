@@ -1,0 +1,66 @@
+name: Release · auto-build macOS DMG
+
+# Tag push (v*) 或手动触发。
+# 无 untrusted input——只用 github.ref_name + matrix.*，无 injection 面。
+#
+# 单 runner (macos-14 · arm64) cross-compile 两个 target：
+# - aarch64-apple-darwin (Apple Silicon native)
+# - x86_64-apple-darwin (Intel via cross-compile)
+# 避开 macos-13 runner 供应不稳的问题（free tier 经常排队 30+ 分钟）。
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - aarch64-apple-darwin
+          - x86_64-apple-darwin
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+          key: ${{ matrix.target }}
+
+      - run: pnpm install
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Ink ${{ github.ref_name }}
+          releaseBody: |
+            macOS DMG 自动构建（aarch64 + x86_64）。
+
+            首次打开 macOS 会报 Gatekeeper 警告（unsigned app）——右键 app 选「打开」一次即可永久放行。
+
+            详见 [README](https://github.com/LinekForge/ink/blob/main/README.md)。
+          releaseDraft: false
+          prerelease: false
+          args: --target ${{ matrix.target }}
