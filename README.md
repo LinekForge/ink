@@ -145,6 +145,10 @@ pnpm exec tsc --noEmit
 
 </details>
 
+## 贡献者
+
+- [@lightallspiritthing](https://github.com/lightallspiritthing) — 国内镜像指引（[#2](https://github.com/LinekForge/ink/pull/2)）· GitHub Actions CI 建议（[#1](https://github.com/LinekForge/ink/issues/1)）
+
 ## 致谢
 
 - [Milkdown](https://milkdown.dev) — 所见即所得 Markdown 引擎
