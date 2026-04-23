@@ -172,6 +172,149 @@ body {
   margin-right: auto;
 }
 
+/* Fidelity blocks —— Mermaid / display math 读态渲染 + 点击进入源码态 */
+.milkdown-host .ProseMirror .ink-fidelity-block {
+  max-width: 100%;
+  margin: 1em 0;
+  border: 1px solid var(--ink-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ink-code-bg) 58%, transparent);
+  overflow: hidden;
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-preview {
+  padding: 14px 16px;
+  cursor: text;
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-editor {
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--ink-border);
+  background: color-mix(in srgb, var(--ink-bg) 72%, var(--ink-code-bg));
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-label {
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-textarea {
+  display: block;
+  width: 100%;
+  min-height: 5.5em;
+  padding: 10px 12px;
+  border: 1px solid var(--ink-border);
+  border-radius: 8px;
+  background: var(--ink-bg);
+  color: var(--ink-fg);
+  font: 13px/1.6 theme('fontFamily.mono');
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-live {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed color-mix(in srgb, var(--ink-border) 78%, transparent);
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-inline {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  max-width: 100%;
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-inline-preview {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.06em 0.3em;
+  border-radius: 6px;
+  cursor: text;
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-inline-editor {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--ink-border);
+  border-radius: 6px;
+  background: var(--ink-bg);
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-inline-mark {
+  color: var(--ink-muted);
+  font: 12px/1 theme('fontFamily.mono');
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-inline-input {
+  width: 9em;
+  min-width: 5em;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink-fg);
+  font: 13px/1.4 theme('fontFamily.mono');
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-inline.is-editing,
+.milkdown-host .ProseMirror .ink-fidelity-block.is-editing {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ink-accent) 18%, transparent);
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-mermaid-preview,
+.milkdown-host .ProseMirror .ink-fidelity-math-preview {
+  overflow-x: auto;
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-mermaid-preview svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-error {
+  display: grid;
+  gap: 8px;
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-error-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: color-mix(in srgb, #c2410c 76%, var(--ink-fg));
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-error-detail {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-error-source {
+  margin: 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: var(--ink-bg);
+  border: 1px dashed var(--ink-border);
+  color: var(--ink-fg);
+  font: 12px/1.6 theme('fontFamily.mono');
+}
+
+.milkdown-host .ProseMirror .katex-display {
+  margin: 0.35em 0;
+}
+
+.milkdown-host .ProseMirror .katex-error {
+  white-space: pre-wrap;
+}
+
 /* Focus Mode —— 当前块清晰，其他 dim 到 30%。
    host 级 class 由 EditorHandle.setFocusMode 打 / 除；.ink-focus-current 来自 focusPlugin 的 Decoration.node（跟 cursor top-level block）。*/
 .milkdown-host.ink-focus-mode .ProseMirror > * {

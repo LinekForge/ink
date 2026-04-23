@@ -15,6 +15,7 @@ import {
 // ProseMirror Node 实例——不强 type（transitive dep 不稳）。只用 .eq() runtime 方法
 import { commonmark } from '@milkdown/preset-commonmark'
 import { gfm, remarkGFMPlugin } from '@milkdown/preset-gfm'
+import { math, katexOptionsCtx } from '@milkdown/plugin-math'
 import { nord } from '@milkdown/theme-nord'
 import {
   history,
@@ -49,6 +50,7 @@ import {
   type MergeHighlightRange,
 } from '../editor/mergeHighlightPlugin'
 import { inkTaskTogglePlugin } from '../editor/taskTogglePlugin'
+import { inkFidelityNodeViews } from '../editor/fidelityNodeViews'
 
 type Props = {
   tabId: string
@@ -232,6 +234,13 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
           // 这样打开含单个 ~ 字符的 md 文件时不会误渲染成 strike。
           ctx.set(remarkGFMPlugin.options.key, { singleTilde: false })
 
+          // Math fallback 兜底：即使 node view 没接上，也不要因为 KaTeX 抛错把
+          // 整块内容打空。真正的源码 + 错误提示由 fidelity node view 承接。
+          ctx.set(katexOptionsCtx.key, {
+            throwOnError: false,
+            strict: 'warn',
+          })
+
           // 所有 doc 变化都走这里 —— dirty 基于 doc tree 比对
           ctx.get(listenerCtx).updated((_ctx, doc) => {
             if (!savedDocRef.current) return
@@ -247,12 +256,14 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
         .config(nord)
         .use(commonmark)
         .use(gfm)
+        .use(math)
         .use(history)
         .use(listener)
         .use(cursor)
         .use(clipboard)
         .use(indent)
         .use(prism)
+        .use(inkFidelityNodeViews)
         .use(inkSearchPlugin)
         .use(inkKeymapOverrides)
         .use(inkHardbreakCleaner)
