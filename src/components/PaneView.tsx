@@ -95,7 +95,9 @@ export function PaneView({ pane, paneIndex, zen, onEditorRef }: Props) {
               onDirtyChange={(dirty) => setDirty(tab.id, dirty)}
             />
           </div>
-          {!zen && <StatusBar content={tab.content} dirty={tab.dirty} />}
+          {!zen && (
+            <StatusBar tabId={tab.id} content={tab.content} dirty={tab.dirty} />
+          )}
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center text-[color:var(--ink-muted)] text-sm select-none">

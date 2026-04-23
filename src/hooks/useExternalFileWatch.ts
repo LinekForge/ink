@@ -7,7 +7,14 @@ import {
   joinFrontmatter,
 } from '../store/workspace'
 import { mergeTexts } from '../lib/diff3'
+import {
+  detectExternalActivityPhase,
+  EXTERNAL_ACTIVITY_ACTIVE_MS,
+  EXTERNAL_ACTIVITY_COOLDOWN_MS,
+  type ExternalActivityPhase,
+} from '../lib/externalActivity'
 import { toast } from '../store/toasts'
+import { externalActivity, useExternalActivity } from '../store/externalActivity'
 import { statusInfo } from '../store/statusInfo'
 import type { EditorHandle } from '../components/Editor'
 
@@ -62,12 +69,60 @@ export function useExternalFileWatch({ getHandleForPane }: Params) {
   const debounceRef = useRef<
     Map<string, { timer: number; latestContent: string }>
   >(new Map())
+  const lastExternalAtRef = useRef<Map<string, number>>(new Map())
+  const activityTimersRef = useRef<
+    Map<string, { cooldown: number | null; idle: number | null }>
+  >(new Map())
   const DEBOUNCE_MS = 200
 
   // ─── event listen（挂一次） ────────────────────────────
   useEffect(() => {
     const unlisteners: Array<() => void> = []
     let cancelled = false
+
+    const clearActivityTimers = (tabId: string) => {
+      const timers = activityTimersRef.current.get(tabId)
+      if (!timers) return
+      if (timers.cooldown) window.clearTimeout(timers.cooldown)
+      if (timers.idle) window.clearTimeout(timers.idle)
+      activityTimersRef.current.delete(tabId)
+    }
+
+    const scheduleActivity = (tabId: string) => {
+      clearActivityTimers(tabId)
+      const next = {
+        cooldown: window.setTimeout(() => {
+          externalActivity.setPhase(tabId, 'cooldown')
+          const current = activityTimersRef.current.get(tabId)
+          if (!current) return
+          current.cooldown = null
+          current.idle = window.setTimeout(() => {
+            externalActivity.clear(tabId)
+            const settled = activityTimersRef.current.get(tabId)
+            if (settled?.idle) window.clearTimeout(settled.idle)
+            activityTimersRef.current.delete(tabId)
+          }, EXTERNAL_ACTIVITY_COOLDOWN_MS)
+        }, EXTERNAL_ACTIVITY_ACTIVE_MS),
+        idle: null,
+      }
+      activityTimersRef.current.set(tabId, next)
+    }
+
+    const handleExternalActivity = (tabId: string) => {
+      const now = Date.now()
+      const previousAt = lastExternalAtRef.current.get(tabId) ?? null
+      lastExternalAtRef.current.set(tabId, now)
+      const currentPhase =
+        useExternalActivity.getState().byTabId[tabId]?.phase ?? 'idle'
+      const nextPhase = detectExternalActivityPhase({
+        previousAt,
+        now,
+        currentPhase: currentPhase as ExternalActivityPhase,
+      })
+      if (nextPhase !== 'active') return
+      externalActivity.setPhase(tabId, 'active')
+      scheduleActivity(tabId)
+    }
 
     /** 把给定的 merged raw content apply 到 editor + store + 提示。
      *  isShownInPane=true 时走 handle 精细 diff 注入（保光标）；否则 bump
@@ -159,6 +214,7 @@ export function useExternalFileWatch({ getHandleForPane }: Params) {
 
     listen<FileChangedPayload>('file-externally-changed', (evt) => {
       const { tabId, content } = evt.payload
+      handleExternalActivity(tabId)
       // Debounce · 200ms 内的同一 tab 多次 event 合并成一次（取最新 content）
       const existing = debounceRef.current.get(tabId)
       if (existing) {
@@ -211,6 +267,12 @@ export function useExternalFileWatch({ getHandleForPane }: Params) {
       // 清理 pending debounce timers · 避免 unmount 后 still firing
       debounceRef.current.forEach((e) => window.clearTimeout(e.timer))
       debounceRef.current.clear()
+      activityTimersRef.current.forEach((timers) => {
+        if (timers.cooldown) window.clearTimeout(timers.cooldown)
+        if (timers.idle) window.clearTimeout(timers.idle)
+      })
+      activityTimersRef.current.clear()
+      lastExternalAtRef.current.clear()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -241,6 +303,12 @@ export function useExternalFileWatch({ getHandleForPane }: Params) {
       if (current.has(key)) return
       const { path, tabId } = parseKey(key)
       invoke('unwatch_file', { path, tabId }).catch(() => {})
+      externalActivity.clear(tabId)
+      lastExternalAtRef.current.delete(tabId)
+      const timers = activityTimersRef.current.get(tabId)
+      if (timers?.cooldown) window.clearTimeout(timers.cooldown)
+      if (timers?.idle) window.clearTimeout(timers.idle)
+      activityTimersRef.current.delete(tabId)
     })
 
     watchedRef.current = current

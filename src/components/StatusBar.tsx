@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { countWords } from '../lib/wordCount'
+import { useExternalActivity } from '../store/externalActivity'
 import {
   useStatusInfo,
   resolveEntryAbsolute,
@@ -9,6 +10,7 @@ import {
 } from '../store/statusInfo'
 
 type Props = {
+  tabId: string
   content: string
   dirty?: boolean
 }
@@ -19,12 +21,13 @@ type Props = {
  *     ✓ message = 当前回执（永不 fade，等被顶替），可点击路径 → Finder 定位
  * 右：字数 · 阅读时间 · 未保存
  */
-export function StatusBar({ content, dirty }: Props) {
+export function StatusBar({ tabId, content, dirty }: Props) {
   const { words, minutes } = useMemo(() => countWords(content), [content])
   const current = useStatusInfo((s) => s.current)
   const history = useStatusInfo((s) => s.history)
   const unseen = useStatusInfo((s) => s.unseen)
   const markSeen = useStatusInfo((s) => s.markSeen)
+  const activity = useExternalActivity((s) => s.byTabId[tabId] ?? null)
 
   const [popoverOpen, setPopoverOpen] = useState(false)
   const popoverRef = useRef<HTMLDivElement | null>(null)
@@ -126,6 +129,29 @@ export function StatusBar({ content, dirty }: Props) {
 
       {/* ─── 右：文档状态 ─── */}
       <div className="flex items-center gap-3 flex-shrink-0">
+        {activity && activity.phase !== 'idle' && (
+          <span
+            title={
+              activity.phase === 'active'
+                ? '外部工具正在连续写入这个文件'
+                : '外部连续写入刚刚停止'
+            }
+            className={`inline-flex items-center gap-1.5 ${
+              activity.phase === 'active'
+                ? 'text-emerald-600'
+                : 'text-amber-600'
+            }`}
+          >
+            <span
+              className={`inline-block w-1.5 h-1.5 rounded-full ${
+                activity.phase === 'active'
+                  ? 'bg-emerald-500 animate-pulse'
+                  : 'bg-amber-500'
+              }`}
+            />
+            {activity.phase === 'active' ? '外部写入中' : '刚停止'}
+          </span>
+        )}
         {dirty && <span className="text-[color:var(--ink-accent)]">未保存</span>}
         {words > 0 ? (
           <span>
