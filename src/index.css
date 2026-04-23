@@ -201,6 +201,24 @@ body {
   border-radius: 4px;
 }
 
+@keyframes ink-merge-highlight-fade {
+  0%,
+  45% {
+    background-color: color-mix(
+      in srgb,
+      #f5dc86 72%,
+      transparent
+    );
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.milkdown-host .ProseMirror .ink-merge-highlight {
+  animation: ink-merge-highlight-fade 2800ms ease-out forwards;
+  border-radius: 3px;
+}
+
 /* Heading · 六级视觉阶梯（2 / 1.5 / 1.25 / 1.05 / 0.95 + letter-spacing / 0.85 uppercase muted） */
 .milkdown-host .ProseMirror h1 {
   font-size: 2em;

@@ -50,7 +50,7 @@ type WorkspaceState = {
   markSaved: (id: string, savedPath?: string) => void
   reloadTabFromExternal: (id: string, rawContent: string) => void
   /** 外部改动三路合并结果注入：更新 content + frontmatter + baseContent。
-   *  dirty 由 Editor 的 doc.eq 自己重算（merge 可能让凡的未保存改动仍在 ours 里）。*/
+   *  dirty 由 Editor 的 doc.eq 自己重算（merge 可能让用户的未保存改动仍在 ours 里）。*/
   applyExternalMerge: (id: string, mergedRaw: string, newBaseContent: string) => void
   /** 强制让 Editor 下次 mount 重新 parse content（non-active tab 合并后用）*/
   bumpReloadRevision: (id: string) => void
@@ -82,7 +82,7 @@ export function splitFrontmatter(md: string): {
   frontmatter: string | null
   body: string
 } {
-  const m = md.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
+  const m = md.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n){0,2}([\s\S]*)$/)
   if (m) return { frontmatter: m[1], body: m[2] }
   return { frontmatter: null, body: md }
 }
@@ -397,4 +397,3 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     })
   },
 }))
-

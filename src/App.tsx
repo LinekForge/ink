@@ -7,7 +7,7 @@ import { MilkdownProvider } from '@milkdown/react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { type EditorHandle } from './components/Editor'
 import { Welcome } from './components/Welcome'
-import { TOC, type Heading } from './components/TOC'
+import { TOC, parseHeadings, type Heading } from './components/TOC'
 import { Settings } from './components/Settings'
 import { Toasts } from './components/Toasts'
 import { UnsavedPrompt } from './components/UnsavedPrompt'
@@ -29,6 +29,11 @@ import { useDragDrop } from './hooks/useDragDrop'
 import { useExternalFileWatch } from './hooks/useExternalFileWatch'
 import { useBackup, flushAllBackups } from './hooks/useBackup'
 import { saveSession, type SessionState } from './store/session'
+import {
+  resolveHeadingIndex,
+  resolveHeadingOccurrence,
+  tocHeadingSelector,
+} from './lib/tocNavigation'
 
 /**
  * Ink — Markdown reader/editor
@@ -131,23 +136,12 @@ function App() {
     setActiveHeading(originalIndex)
     tocLockUntilRef.current = Date.now() + 1500
 
-    const container = document.querySelector(
-      `[data-pane-index="${activePaneIndex}"] .milkdown-host`,
-    )
-    if (!container) return
-    const norm = (s: string) => s.replace(/\s+/g, ' ').trim()
-    const target = norm(h.text)
-    const all = container.querySelectorAll('h1,h2,h3,h4,h5,h6')
-    for (const el of Array.from(all)) {
-      if (norm(el.textContent ?? '') === target) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        // flash 一下让用户知道"点的就是这个"（防 3.1→3.1.1 的视觉错觉）
-        const hit = el as HTMLElement
-        hit.classList.add('ink-toc-flash')
-        window.setTimeout(() => hit.classList.remove('ink-toc-flash'), 1200)
-        return
-      }
-    }
+    const headings = activeTab ? parseHeadings(activeTab.content) : []
+    const headingIndex = resolveHeadingIndex(headings, h, originalIndex)
+    const duplicateIndex = resolveHeadingOccurrence(headings, headingIndex, h.text)
+    editorHandles.current
+      .get(activePaneIndex)
+      ?.scrollToHeading(h.text, headingIndex, duplicateIndex)
   }
 
   // ─── Keybindings ────────────────────────────────────────
@@ -201,7 +195,7 @@ function App() {
   })
 
   // ─── 启动：argv 文件 + 扫 backup ──────────────────────────
-  // 凡的设计：冷启动干干净净——有 argv 就打开 argv；没 argv 就 Welcome。
+  // 冷启动干干净净——有 argv 就打开 argv；没 argv 就 Welcome。
   // 另外启动扫一次未保存 backup（上次 crash / 断电留的），非空弹恢复对话框。
   useEffect(() => {
     ;(async () => {
@@ -337,7 +331,7 @@ function App() {
       // TOC 点击后 1.5s 内 scroll listener 不覆盖（尊重用户点击意图）
       if (Date.now() < tocLockUntilRef.current) return
       const headings = container.querySelectorAll(
-        'h1,h2,h3,h4,h5,h6',
+        tocHeadingSelector,
       ) as NodeListOf<HTMLElement>
       if (!headings.length) {
         setActiveHeading(null)

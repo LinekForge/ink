@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 
-type Heading = {
+export type Heading = {
   level: number // 1-6
   text: string
   line: number // line number in markdown (1-indexed)
@@ -24,7 +24,7 @@ function cleanHeadingText(raw: string): string {
  * 不处理 setext (underline) 形式。忽略 fenced code block 内的 #。
  * 自动 strip inline md 符号。
  */
-function parseHeadings(markdown: string): Heading[] {
+export function parseHeadings(markdown: string): Heading[] {
   const lines = markdown.split('\n')
   const out: Heading[] = []
   let inFence = false
@@ -245,5 +245,3 @@ export function TOC({ markdown, activeIndex, onNavigate, onClose }: Props) {
     </aside>
   )
 }
-
-export type { Heading }

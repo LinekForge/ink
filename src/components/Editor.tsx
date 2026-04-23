@@ -33,6 +33,7 @@ import { TextSelection } from '@milkdown/prose/state'
 import { closeHistory } from '@milkdown/prose/history'
 import { computeDocDiff } from '../lib/milkdownDocDiff'
 import { resolveImageSrc } from '../lib/imagePath'
+import { pickHeadingElement, tocHeadingSelector } from '../lib/tocNavigation'
 import { toast } from '../store/toasts'
 import { statusInfo } from '../store/statusInfo'
 import { inkSearchPlugin } from '../editor/searchMilkdown'
@@ -42,6 +43,11 @@ import { inkPlaceholderPlugin } from '../editor/placeholderPlugin'
 import { inkHardbreakCleaner } from '../editor/hardbreakCleaner'
 import { inkCalloutPlugin } from '../editor/calloutPlugin'
 import { inkFocusPlugin, focusPluginKey } from '../editor/focusPlugin'
+import {
+  inkMergeHighlightPlugin,
+  mergeHighlightPluginKey,
+  type MergeHighlightRange,
+} from '../editor/mergeHighlightPlugin'
 import { inkTaskTogglePlugin } from '../editor/taskTogglePlugin'
 
 type Props = {
@@ -76,6 +82,12 @@ export type EditorHandle = {
   searchNavigate: (dir: 1 | -1) => void
   /** Focus Mode 切换 · 当前段落清晰、其他 dim */
   setFocusMode: (enabled: boolean) => void
+  /** TOC 点击跳转到指定 heading */
+  scrollToHeading: (
+    targetText: string,
+    headingIndex: number,
+    duplicateIndex: number,
+  ) => boolean
   /** 外部三路合并结果注入 editor。
    *  - 用 Milkdown plugin-diff 的 computeDocDiff 算精细变化区
    *  - 只对变化区做 replace · 未变化区域 mapping 是 identity
@@ -110,6 +122,7 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const editorRef = useRef<MilkdownEditor | null>(null)
+  const mergeHighlightTimerRef = useRef<number | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ProseMirror Node transitive type 不稳
   const savedDocRef = useRef<any>(null)
 
@@ -157,8 +170,43 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
         const el = containerRef.current
         if (el) el.classList.toggle('ink-focus-mode', enabled)
       },
+      scrollToHeading: (targetText, headingIndex, duplicateIndex) => {
+        const container = containerRef.current
+        if (!container) return false
+        const all = Array.from(container.querySelectorAll(tocHeadingSelector))
+        const target = pickHeadingElement(
+          all,
+          targetText,
+          headingIndex,
+          duplicateIndex,
+        )
+        if (!target) return false
+
+        const hit = target as HTMLElement
+        hit.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        // flash 一下让用户知道"点的就是这个"（防 3.1→3.1.1 的视觉错觉）
+        hit.classList.add('ink-toc-flash')
+        window.setTimeout(() => hit.classList.remove('ink-toc-flash'), 1200)
+        return true
+      },
       applyMergedMarkdown: (md) => {
-        applyMerged(editorRef.current, md)
+        applyMerged(editorRef.current, md, (ranges) => {
+          if (mergeHighlightTimerRef.current) {
+            window.clearTimeout(mergeHighlightTimerRef.current)
+            mergeHighlightTimerRef.current = null
+          }
+          dispatchMergeHighlight(
+            editorRef.current,
+            ranges.length
+              ? { type: 'set', ranges }
+              : { type: 'clear' },
+          )
+          if (!ranges.length) return
+          mergeHighlightTimerRef.current = window.setTimeout(() => {
+            dispatchMergeHighlight(editorRef.current, { type: 'clear' })
+            mergeHighlightTimerRef.current = null
+          }, 2800)
+        })
       },
     }),
     [],
@@ -211,6 +259,7 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
         .use(inkPlaceholderPlugin)
         .use(inkCalloutPlugin)
         .use(inkFocusPlugin)
+        .use(inkMergeHighlightPlugin)
         .use(inkTaskTogglePlugin)
         .create()
 
@@ -251,6 +300,10 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
 
     return () => {
       cancelled = true
+      if (mergeHighlightTimerRef.current) {
+        window.clearTimeout(mergeHighlightTimerRef.current)
+        mergeHighlightTimerRef.current = null
+      }
       editorRef.current?.destroy()
       editorRef.current = null
       savedDocRef.current = null
@@ -357,6 +410,10 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 绕开 PluginKey / Meta 传递的 type 耦合（接口稳定在 searchPlugin.ts）
 type SearchMetaPayload = any
 
+type MergeHighlightMetaPayload =
+  | { type: 'set'; ranges: MergeHighlightRange[] }
+  | { type: 'clear' }
+
 /** 给 search plugin 发 meta transaction */
 function dispatchSearchMeta(
   editor: MilkdownEditor | null,
@@ -370,6 +427,21 @@ function dispatchSearchMeta(
     })
   } catch (e) {
     console.warn('dispatchSearchMeta failed:', e)
+  }
+}
+
+function dispatchMergeHighlight(
+  editor: MilkdownEditor | null,
+  meta: MergeHighlightMetaPayload,
+): void {
+  if (!editor) return
+  try {
+    editor.action((ctx) => {
+      const view = ctx.get(editorViewCtx)
+      view.dispatch(view.state.tr.setMeta(mergeHighlightPluginKey, meta))
+    })
+  } catch (e) {
+    console.warn('dispatchMergeHighlight failed:', e)
   }
 }
 
@@ -402,7 +474,11 @@ function insertImageAtCursor(
  *
  * 参考：Milkdown plugin-streaming/src/flush.ts 里的 flushBuffer 实现。
  */
-function applyMerged(editor: MilkdownEditor | null, md: string): void {
+function applyMerged(
+  editor: MilkdownEditor | null,
+  md: string,
+  onHighlight: (ranges: MergeHighlightRange[]) => void,
+): void {
   if (!editor) return
   try {
     editor.action((ctx) => {
@@ -426,6 +502,13 @@ function applyMerged(editor: MilkdownEditor | null, md: string): void {
         )
       }
 
+      const highlightRanges = changes
+        .map((c) => ({
+          from: tr.mapping.map(c.fromA, -1),
+          to: tr.mapping.map(c.toA, 1),
+        }))
+        .filter((range) => range.to > range.from)
+
       // 把旧光标 position 透过 mapping 映射到新 doc · 未变化区 identity
       try {
         const mapped = tr.mapping.map(oldCursor)
@@ -439,6 +522,7 @@ function applyMerged(editor: MilkdownEditor | null, md: string): void {
       tr = closeHistory(tr)
 
       view.dispatch(tr)
+      onHighlight(highlightRanges)
     })
   } catch (e) {
     console.warn('applyMerged failed:', e)
