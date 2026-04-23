@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { copyScrollTop, forgetScrollTop } from '../lib/viewportMemory'
 
 /**
  * Workspace state —— 支持 1 或 2 个 panes，每 pane 有自己的 tabs 组。
@@ -183,6 +184,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
 
   closeTab: (id) => {
+    forgetScrollTop(id)
     set((s) => {
       const newPanes = s.panes.map((p) => {
         const idx = p.tabs.findIndex((t) => t.id === id)
@@ -376,7 +378,13 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         ? {
             // 浅拷贝：path 相同但 id 独立，两个 tab 在新系统下各自 watch file
             // 各自维护 baseContent（外部 merge 时各自 diff3）
-            tabs: [{ ...active, id: nextId() }],
+            tabs: [
+              (() => {
+                const nextIdValue = nextId()
+                copyScrollTop(active.id, nextIdValue)
+                return { ...active, id: nextIdValue }
+              })(),
+            ],
             activeTabId: null,
           }
         : emptyPane()
@@ -390,6 +398,8 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
 
   closePane: (index) => {
+    const pane = get().panes[index]
+    pane?.tabs.forEach((tab) => forgetScrollTop(tab.id))
     set((s) => {
       if (s.panes.length <= 1) return s
       const newPanes = s.panes.filter((_, i) => i !== index)

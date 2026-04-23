@@ -13,6 +13,8 @@ type Props = {
 }
 
 const basename = (p: string) => p.split('/').pop() || p
+const labelFor = (p: string) =>
+  p.startsWith('untitled:') ? '未命名草稿' : basename(p)
 
 function formatAge(savedAt: number): string {
   const diff = Date.now() / 1000 - savedAt
@@ -54,10 +56,10 @@ export function BackupRestorePrompt({
       >
         <div className="space-y-1">
           <div className="text-sm font-medium text-[color:var(--ink-fg)]">
-            发现 {backups.length} 个未保存的改动
+            发现 {backups.length} 份未保存的备份
           </div>
           <div className="text-xs text-[color:var(--ink-muted)] leading-relaxed">
-            上次 Ink 退出或崩溃时没来得及 ⌘S。要恢复这些改动到 editor 吗？
+            上次退出前，这些改动还没写回文件。恢复后会以“未保存”状态打开，你再决定要不要保存。
           </div>
         </div>
 
@@ -71,7 +73,7 @@ export function BackupRestorePrompt({
                 className="font-mono text-[color:var(--ink-fg)] truncate flex-1"
                 title={b.path}
               >
-                {basename(b.path)}
+                {labelFor(b.path)}
               </span>
               <span className="text-[10px] text-[color:var(--ink-muted)] flex-shrink-0">
                 {formatAge(b.savedAt)}

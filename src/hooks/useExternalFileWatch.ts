@@ -13,12 +13,15 @@ import {
   EXTERNAL_ACTIVITY_COOLDOWN_MS,
   type ExternalActivityPhase,
 } from '../lib/externalActivity'
+import {
+  buildConflictMessage,
+  buildExternalSyncMessage,
+  buildMissingFileMessage,
+} from '../lib/statusMessages'
 import { toast } from '../store/toasts'
 import { externalActivity, useExternalActivity } from '../store/externalActivity'
 import { statusInfo } from '../store/statusInfo'
 import type { EditorHandle } from '../components/Editor'
-
-const basename = (p: string) => p.split('/').pop() || p
 
 /** 生成 sidecar 路径：{dir}/{name}.conflict-{YYYYMMDDHHMMSS}.{ext}
  *  冲突时把外部版本（theirs）写到这里备份——Obsidian 1.9.7 的做法 */
@@ -171,7 +174,7 @@ export function useExternalFileWatch({ getHandleForPane }: Params) {
       if (ours === base) {
         applyAndSync({
           tabId, paneIdx, mergedRaw: theirs, theirs, isShownInPane,
-          infoMsg: `${tab.title} 外部改动已同步`, infoPath,
+          infoMsg: buildExternalSyncMessage(tab.title, 'synced'), infoPath,
         })
         useWorkspace.getState().bumpSavedRevision(tabId)
         return
@@ -188,16 +191,21 @@ export function useExternalFileWatch({ getHandleForPane }: Params) {
           const sidecar = makeSidecarPath(tab.path)
           try {
             await invoke('write_file', { path: sidecar, content: theirs })
-            toast.warn(
-              `${tab.title} 有冲突 · 外部版本已另存为 ${basename(sidecar)}`,
-            )
+            const notice = buildConflictMessage({
+              title: tab.title,
+              sidecarPath: sidecar,
+            })
+            toast.warn(notice.message, { path: notice.path })
           } catch (e) {
-            toast.warn(
-              `${tab.title} 有冲突 · sidecar 保存失败：${String(e)}`,
-            )
+            const notice = buildConflictMessage({
+              title: tab.title,
+              sidecarError: String(e),
+            })
+            toast.warn(notice.message, { path: tab.path ?? undefined })
           }
         } else {
-          toast.warn(`${tab.title} 有冲突（无 path 无法 sidecar）`)
+          const notice = buildConflictMessage({ title: tab.title })
+          toast.warn(notice.message)
         }
         // 传 ours 当 mergedRaw：applyExternalMerge 里 splitFrontmatter(ours)
         // 拆出的 content/frontmatter 与当前一致，set 是幂等——实质只更新 base
@@ -208,7 +216,7 @@ export function useExternalFileWatch({ getHandleForPane }: Params) {
       // 干净合并：两边改动都保留
       applyAndSync({
         tabId, paneIdx, mergedRaw: merged, theirs, isShownInPane,
-        infoMsg: `${tab.title} 外部改动已合并`, infoPath,
+        infoMsg: buildExternalSyncMessage(tab.title, 'merged'), infoPath,
       })
     }
 
@@ -247,13 +255,13 @@ export function useExternalFileWatch({ getHandleForPane }: Params) {
         .find((t) => t.id === tabId)
       if (!tab || tab.missing) return
       useWorkspace.getState().setMissing(tabId, true)
-      // 能识别出 rename 新位置就显示，否则 fallback
-      const msg = newPath
-        ? `${tab.title} 已移动到 ${basename(newPath)}`
-        : `${tab.title} 已从原位置移动或删除`
-      statusInfo.warn(msg, { path: tab.path ?? undefined })
       // missing 是 destructive 变化（等 ⌘S 弹 saveTabAs 就太晚）· toast 确保看到
-      toast.warn(msg)
+      const notice = buildMissingFileMessage({
+        title: tab.title,
+        previousPath: tab.path,
+        newPath,
+      })
+      toast.warn(notice.message, { path: notice.path })
     })
       .then((fn) => {
         if (cancelled) fn()

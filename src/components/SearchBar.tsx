@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { type MouseEvent, useEffect, useRef, useState } from 'react'
 import type { EditorHandle } from './Editor'
 import { useSearchStore } from '../store/searchStore'
 
@@ -55,10 +55,8 @@ export function SearchBar({ getHandle, onClose }: Props) {
     getHandle()?.searchNavigate(dir)
   }
 
-  const close = () => {
-    getHandle()?.searchClose()
-    onClose()
-  }
+  const close = () => onClose()
+  const keepInputFocus = (e: MouseEvent<HTMLButtonElement>) => e.preventDefault()
 
   return (
     <div className="absolute top-12 right-4 z-30 bg-[color:var(--ink-bg)] border border-[color:var(--ink-border)] rounded-md shadow-lg flex items-center gap-1 px-2 py-1 text-xs">
@@ -102,6 +100,7 @@ export function SearchBar({ getHandle, onClose }: Props) {
       </div>
 
       <button
+        onMouseDown={keepInputFocus}
         onClick={() => setCaseSensitive((v) => !v)}
         title={`大小写${caseSensitive ? '敏感' : '不敏感'}`}
         className={`w-6 h-6 flex items-center justify-center rounded font-mono text-[10px] transition-colors ${
@@ -113,6 +112,7 @@ export function SearchBar({ getHandle, onClose }: Props) {
         Aa
       </button>
       <button
+        onMouseDown={keepInputFocus}
         onClick={() => setRegex((v) => !v)}
         title={regex ? '正则：开' : '正则：关'}
         className={`w-6 h-6 flex items-center justify-center rounded font-mono text-[10px] transition-colors ${
@@ -127,6 +127,7 @@ export function SearchBar({ getHandle, onClose }: Props) {
       <div className="w-px h-4 bg-[color:var(--ink-border)] mx-0.5" />
 
       <button
+        onMouseDown={keepInputFocus}
         onClick={() => navigate(-1)}
         disabled={total === 0}
         className="w-6 h-6 flex items-center justify-center rounded hover:bg-[color:var(--ink-border)]/40 text-[color:var(--ink-muted)] disabled:opacity-40"
@@ -135,6 +136,7 @@ export function SearchBar({ getHandle, onClose }: Props) {
         ↑
       </button>
       <button
+        onMouseDown={keepInputFocus}
         onClick={() => navigate(1)}
         disabled={total === 0}
         className="w-6 h-6 flex items-center justify-center rounded hover:bg-[color:var(--ink-border)]/40 text-[color:var(--ink-muted)] disabled:opacity-40"
@@ -143,6 +145,7 @@ export function SearchBar({ getHandle, onClose }: Props) {
         ↓
       </button>
       <button
+        onMouseDown={keepInputFocus}
         onClick={close}
         className="w-6 h-6 flex items-center justify-center rounded hover:bg-[color:var(--ink-border)]/40 text-[color:var(--ink-muted)]"
         title="关闭 (esc)"

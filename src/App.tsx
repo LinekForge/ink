@@ -21,6 +21,7 @@ import { PaneView } from './components/PaneView'
 import { Lightbox } from './components/Lightbox'
 import { useWorkspace } from './store/workspace'
 import { toast } from './store/toasts'
+import { statusInfo } from './store/statusInfo'
 import { useSettings } from './store/settings'
 import { useFile } from './hooks/useFile'
 import { useKeybinding } from './hooks/useKeybinding'
@@ -34,6 +35,10 @@ import {
   resolveHeadingOccurrence,
   tocHeadingSelector,
 } from './lib/tocNavigation'
+import {
+  buildBackupDiscardSummary,
+  buildBackupRestoreSummary,
+} from './lib/statusMessages'
 
 /**
  * Ink — Markdown reader/editor
@@ -92,8 +97,9 @@ function App() {
 
   /** TOC 当前高亮的 heading 索引（跟随滚动） */
   const [activeHeading, setActiveHeading] = useState<number | null>(null)
-  /** TOC 点击锁 · 1.5s 内不让 scroll 反推覆盖用户意图 */
+  /** TOC 点击锁 · 短时间内不让 scroll 反推覆盖用户意图 */
   const tocLockUntilRef = useRef(0)
+  const TOC_LOCK_MS = 1000
 
   /** paneIndex → EditorHandle（Milkdown undo/redo / 拖图片插入 入口）*/
   const editorHandles = useRef<Map<number, EditorHandle>>(new Map())
@@ -126,22 +132,133 @@ function App() {
     editorHandles.current.forEach((h) => h.setFocusMode(focusMode))
   }, [focusMode])
 
+  const focusActiveEditor = () => {
+    window.requestAnimationFrame(() => {
+      editorHandles.current.get(activePaneIndex)?.focus()
+    })
+  }
+
+  const closeSearch = (restoreFocus = false) => {
+    setSearchOpen(false)
+    if (restoreFocus) focusActiveEditor()
+  }
+
+  const openSearchBar = () => {
+    setSettingsOpen(false)
+    setHelpOpen(false)
+    setSearchOpen(true)
+  }
+
+  const openSettingsPanel = () => {
+    closeSearch(false)
+    setHelpOpen(false)
+    setSettingsOpen(true)
+  }
+
+  const openShortcutHelp = () => {
+    closeSearch(false)
+    setSettingsOpen(false)
+    setHelpOpen(true)
+  }
+
+  const discardBackups = () => {
+    const backups = backupsToRestore
+    if (!backups?.length) return
+    setBackupsToRestore(null)
+    for (const b of backups) {
+      invoke('delete_backup', { path: b.path }).catch(() => {})
+    }
+    statusInfo.info(buildBackupDiscardSummary(backups.length))
+  }
+
+  const restoreBackups = async () => {
+    const backups = backupsToRestore
+    if (!backups?.length) return
+    setBackupsToRestore(null)
+    const ws = useWorkspace.getState()
+    for (const b of backups) {
+      if (b.path.startsWith('untitled:')) {
+        // Untitled · 新开空 tab + 灌 backup 内容 + 标 dirty
+        ws.newEmptyTab()
+        const state = useWorkspace.getState()
+        const pane = state.panes[state.activePaneIndex]
+        const newTab = pane.tabs[pane.tabs.length - 1]
+        if (newTab) {
+          ws.loadRestoredBackup(newTab.id, b.content)
+        }
+        // 旧 backup key（untitled:oldid）在新 tab ⌘S 或 close 时会清
+        // 这里立刻清掉以免下次启动重复弹
+        invoke('delete_backup', { path: b.path }).catch(() => {})
+      } else {
+        // 有 path · openPath → loadRestoredBackup 覆盖成 backup 内容
+        await openPath(b.path)
+        const state = useWorkspace.getState()
+        const opened = state.panes
+          .flatMap((p) => p.tabs)
+          .find((t) => t.path === b.path)
+        if (opened) {
+          ws.loadRestoredBackup(opened.id, b.content)
+        }
+      }
+    }
+    statusInfo.info(buildBackupRestoreSummary(backups.length))
+    focusActiveEditor()
+  }
+
+  const handleEscape = () => {
+    if (lightbox) {
+      setLightbox(null)
+      return
+    }
+    if (confirmClose) {
+      cancelCloseConfirm()
+      return
+    }
+    if (windowClose) {
+      setWindowClose(null)
+      return
+    }
+    if (backupsToRestore) {
+      discardBackups()
+      return
+    }
+    if (settingsOpen) {
+      setSettingsOpen(false)
+      return
+    }
+    if (helpOpen) {
+      setHelpOpen(false)
+      return
+    }
+    if (searchOpen) {
+      closeSearch(true)
+      return
+    }
+    if (tocVisible && activeTab) {
+      toggleToc()
+      return
+    }
+    if (zenMode) {
+      setZenMode(false)
+    }
+  }
+
   // ─── TOC 点击跳转：scroll to heading in active pane ───
   // h.text 已在 parseHeadings 里 strip 过 md inline 符号（反引号 / 星号 /
   // 下划线）。DOM textContent 里的 code tag 内容也只是纯文本，所以两边
   // clean 后可比对。再加 whitespace normalize 防 tab / 多空格差异。
   const onTocNavigate = (h: Heading, originalIndex: number) => {
-    // 立即更新 active 到点击项 + 锁住 1.5s（文档末尾 heading scroll 不动时
+    // 立即更新 active 到点击项 + 短锁一下（文档末尾 heading scroll 不动时
     // 也能让 TOC 蓝色高亮跳到被点的那个；期间 scroll listener 不覆盖）
     setActiveHeading(originalIndex)
-    tocLockUntilRef.current = Date.now() + 1500
 
     const headings = activeTab ? parseHeadings(activeTab.content) : []
     const headingIndex = resolveHeadingIndex(headings, h, originalIndex)
     const duplicateIndex = resolveHeadingOccurrence(headings, headingIndex, h.text)
-    editorHandles.current
+    const didNavigate = editorHandles.current
       .get(activePaneIndex)
       ?.scrollToHeading(h.text, headingIndex, duplicateIndex)
+    tocLockUntilRef.current = Date.now() + (didNavigate ? TOC_LOCK_MS : 120)
   }
 
   // ─── Keybindings ────────────────────────────────────────
@@ -157,14 +274,12 @@ function App() {
     },
     'Cmd+backslash': () => splitRight(),
     'Cmd+Shift+o': () => toggleToc(),
-    'Cmd+comma': () => setSettingsOpen(true),
-    'Cmd+f': () => setSearchOpen(true),
-    'Cmd+slash': () => setHelpOpen(true),
+    'Cmd+comma': () => openSettingsPanel(),
+    'Cmd+f': () => openSearchBar(),
+    'Cmd+slash': () => openShortcutHelp(),
     'Cmd+Shift+enter': () => setZenMode((z) => !z),
     'Cmd+Shift+l': () => setFocusMode((f) => !f),
-    escape: () => {
-      if (zenMode) setZenMode(false)
-    },
+    escape: handleEscape,
     // Chrome 风格切 tab: Cmd+⇧] 下一个 / Cmd+⇧[ 上一个
     'Cmd+Shift+bracketright': () => {
       if (!activePane) return
@@ -351,9 +466,16 @@ function App() {
 
     compute()
     container.addEventListener('scroll', compute, { passive: true })
+    const releaseLock = () => {
+      tocLockUntilRef.current = 0
+    }
+    container.addEventListener('wheel', releaseLock, { passive: true })
+    container.addEventListener('touchstart', releaseLock, { passive: true })
     const settle = window.setTimeout(compute, 200)
     return () => {
       container.removeEventListener('scroll', compute)
+      container.removeEventListener('wheel', releaseLock)
+      container.removeEventListener('touchstart', releaseLock)
       window.clearTimeout(settle)
     }
   }, [activePaneIndex, activeTab, tocVisible])
@@ -366,7 +488,7 @@ function App() {
         const id = evt.payload
         switch (id) {
           case 'app.settings':
-            setSettingsOpen(true)
+            openSettingsPanel()
             break
           case 'file.open':
             openFileDialog()
@@ -398,7 +520,7 @@ function App() {
             editorHandles.current.get(activePaneIndex)?.redo()
             break
           case 'help.shortcuts':
-            setHelpOpen(true)
+            openShortcutHelp()
             break
         }
       })
@@ -513,7 +635,7 @@ function App() {
           {searchOpen && (
             <SearchBar
               getHandle={() => editorHandles.current.get(activePaneIndex)}
-              onClose={() => setSearchOpen(false)}
+              onClose={() => closeSearch(true)}
             />
           )}
           {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
@@ -554,43 +676,8 @@ function App() {
           {backupsToRestore && (
             <BackupRestorePrompt
               backups={backupsToRestore}
-              onRestoreAll={async () => {
-                const backups = backupsToRestore
-                setBackupsToRestore(null)
-                const ws = useWorkspace.getState()
-                for (const b of backups) {
-                  if (b.path.startsWith('untitled:')) {
-                    // Untitled · 新开空 tab + 灌 backup 内容 + 标 dirty
-                    ws.newEmptyTab()
-                    const state = useWorkspace.getState()
-                    const pane = state.panes[state.activePaneIndex]
-                    const newTab = pane.tabs[pane.tabs.length - 1]
-                    if (newTab) {
-                      ws.loadRestoredBackup(newTab.id, b.content)
-                    }
-                    // 旧 backup key（untitled:oldid）在新 tab ⌘S 或 close 时会清
-                    // 这里立刻清掉以免下次启动重复弹
-                    invoke('delete_backup', { path: b.path }).catch(() => {})
-                  } else {
-                    // 有 path · openPath → loadRestoredBackup 覆盖成 backup 内容
-                    await openPath(b.path)
-                    const state = useWorkspace.getState()
-                    const opened = state.panes
-                      .flatMap((p) => p.tabs)
-                      .find((t) => t.path === b.path)
-                    if (opened) {
-                      ws.loadRestoredBackup(opened.id, b.content)
-                    }
-                  }
-                }
-              }}
-              onDiscardAll={() => {
-                const backups = backupsToRestore
-                setBackupsToRestore(null)
-                for (const b of backups) {
-                  invoke('delete_backup', { path: b.path }).catch(() => {})
-                }
-              }}
+              onRestoreAll={restoreBackups}
+              onDiscardAll={discardBackups}
             />
           )}
 

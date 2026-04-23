@@ -4,6 +4,7 @@ import { Editor, type EditorHandle } from './Editor'
 import { StatusBar } from './StatusBar'
 import { useWorkspace, type Pane } from '../store/workspace'
 import { useSettings } from '../store/settings'
+import { readScrollTop, rememberScrollTop } from '../lib/viewportMemory'
 
 type Props = {
   pane: Pane
@@ -90,9 +91,13 @@ export function PaneView({ pane, paneIndex, zen, onEditorRef }: Props) {
               initialValue={tab.content}
               savedRevision={tab.savedRevision}
               reloadRevision={tab.reloadRevision}
+              initialScrollTop={readScrollTop(tab.id)}
               initiallyDirty={tab.dirty}
               onChange={(md) => updateContent(tab.id, md)}
               onDirtyChange={(dirty) => setDirty(tab.id, dirty)}
+              onScrollTopChange={(scrollTop) =>
+                rememberScrollTop(tab.id, scrollTop)
+              }
             />
           </div>
           {!zen && (

@@ -21,6 +21,11 @@ export type Toast = {
   createdAt: number
 }
 
+type ToastStatusOpts = {
+  path?: string
+  tabDir?: string | null
+}
+
 type State = {
   toasts: Toast[]
   push: (level: ToastLevel, message: string) => void
@@ -49,12 +54,12 @@ export const useToasts = create<State>((set, get) => ({
 
 /** 快捷函数 —— toast 和 statusInfo 历史双写 */
 export const toast = {
-  warn: (msg: string) => {
+  warn: (msg: string, opts?: ToastStatusOpts) => {
     useToasts.getState().push('warn', msg)
-    statusInfo.warn(msg)
+    statusInfo.warn(msg, opts)
   },
-  error: (msg: string) => {
+  error: (msg: string, opts?: ToastStatusOpts) => {
     useToasts.getState().push('error', msg)
-    statusInfo.error(msg)
+    statusInfo.error(msg, opts)
   },
 }

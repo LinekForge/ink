@@ -133,15 +133,15 @@ export function StatusBar({ tabId, content, dirty }: Props) {
           <span
             title={
               activity.phase === 'active'
-                ? '外部工具正在连续写入这个文件'
-                : '外部连续写入刚刚停止'
+                ? '外部工具正在连续改这个文件'
+                : '外部连续改动刚刚结束'
             }
             className={`inline-flex items-center gap-1.5 ${
               activity.phase === 'active'
                 ? 'text-emerald-600'
                 : 'text-amber-600'
             }`}
-          >
+            >
             <span
               className={`inline-block w-1.5 h-1.5 rounded-full ${
                 activity.phase === 'active'
@@ -149,7 +149,7 @@ export function StatusBar({ tabId, content, dirty }: Props) {
                   : 'bg-amber-500'
               }`}
             />
-            {activity.phase === 'active' ? '外部写入中' : '刚停止'}
+            {activity.phase === 'active' ? '外部同步中' : '刚同步完'}
           </span>
         )}
         {dirty && <span className="text-[color:var(--ink-accent)]">未保存</span>}
@@ -245,7 +245,7 @@ function HistoryItem({
         </span>
         {entry.passive && (
           <span className="text-[10px] text-[color:var(--ink-accent)] flex-shrink-0">
-            · 被动
+            · 自动
           </span>
         )}
       </div>

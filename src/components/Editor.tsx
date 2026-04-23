@@ -32,6 +32,8 @@ import { callCommand } from '@milkdown/utils'
 import { Slice } from '@milkdown/prose/model'
 import { TextSelection } from '@milkdown/prose/state'
 import { closeHistory } from '@milkdown/prose/history'
+import type { Mapping } from '@milkdown/prose/transform'
+import type { EditorView as ProseMirrorView } from '@milkdown/prose/view'
 import { computeDocDiff } from '../lib/milkdownDocDiff'
 import { resolveImageSrc } from '../lib/imagePath'
 import { pickHeadingElement, tocHeadingSelector } from '../lib/tocNavigation'
@@ -61,16 +63,19 @@ type Props = {
   savedRevision: number
   /** caller 递增此 marker → Editor 重新 mount 加载新 content（用于外部文件 reload）*/
   reloadRevision: number
+  initialScrollTop: number
   /** Mount 时 store 里 dirty 状态——true 表示 initialValue 和 disk 不一致
    *  （如 backup 恢复）· 此时 Editor 不 reset dirty，保留 store 的值 */
   initiallyDirty: boolean
   onChange: (markdown: string) => void
   /** doc 变化时 emit——基于 ProseMirror doc.eq(savedDoc) 的 ground-truth dirty */
   onDirtyChange: (dirty: boolean) => void
+  onScrollTopChange: (scrollTop: number) => void
 }
 
 /** Imperative handle 供外部（菜单 undo/redo / 拖拽插图 / SearchBar）调用 */
 export type EditorHandle = {
+  focus: () => void
   undo: () => void
   redo: () => void
   insertImage: (src: string) => void
@@ -116,22 +121,43 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
     initialValue,
     savedRevision,
     reloadRevision,
+    initialScrollTop,
     initiallyDirty,
     onChange,
     onDirtyChange,
+    onScrollTopChange,
   },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const editorRef = useRef<MilkdownEditor | null>(null)
   const mergeHighlightTimerRef = useRef<number | null>(null)
+  const scrollSyncFrameRef = useRef<number | null>(null)
+  const scrollRestoreFrameRef = useRef<number | null>(null)
+  const onScrollTopChangeRef = useRef(onScrollTopChange)
+  const lastReportedScrollTopRef = useRef(0)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ProseMirror Node transitive type 不稳
   const savedDocRef = useRef<any>(null)
+
+  useEffect(() => {
+    onScrollTopChangeRef.current = onScrollTopChange
+  }, [onScrollTopChange])
+
+  const focusEditor = () => {
+    try {
+      editorRef.current?.action((ctx) => ctx.get(editorViewCtx).focus())
+    } catch {
+      /* focus 不是关键路径，失败忽略 */
+    }
+  }
 
   // ─── Imperative handle for menu undo/redo / 拖拽插图 / SearchBar ─────
   useImperativeHandle(
     ref,
     () => ({
+      focus: () => {
+        focusEditor()
+      },
       undo: () => {
         editorRef.current?.action(callCommand(undoCommand.key))
       },
@@ -192,7 +218,7 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
         return true
       },
       applyMergedMarkdown: (md) => {
-        applyMerged(editorRef.current, md, (ranges) => {
+        applyMerged(editorRef.current, containerRef.current, md, (ranges) => {
           if (mergeHighlightTimerRef.current) {
             window.clearTimeout(mergeHighlightTimerRef.current)
             mergeHighlightTimerRef.current = null
@@ -292,15 +318,21 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
           savedDocRef.current = doc
           onDirtyChange(false)
         }
+        const restoreScroll = () => {
+          const el = containerRef.current
+          if (!el) return
+          el.scrollTop = initialScrollTop
+          lastReportedScrollTopRef.current = Math.round(el.scrollTop)
+        }
         // 打开文件 / 新建空白后直接能打字。用 setTimeout(100) 让 React
         // + DOM 稳定（requestAnimationFrame 太早——rendering chain 还
         // 没结束 focus 会被 unmount/remount 冲掉，"新建空白没法输入"就这）
         setTimeout(() => {
-          try {
-            editor.action((ctx) => ctx.get(editorViewCtx).focus())
-          } catch {
-            /* focus 不是关键路径，失败忽略 */
-          }
+          restoreScroll()
+          focusEditor()
+          scrollRestoreFrameRef.current = window.requestAnimationFrame(
+            restoreScroll,
+          )
         }, 100)
       } catch (e) {
         console.warn('Editor init savedDoc failed:', e)
@@ -315,6 +347,14 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
         window.clearTimeout(mergeHighlightTimerRef.current)
         mergeHighlightTimerRef.current = null
       }
+      if (scrollSyncFrameRef.current) {
+        window.cancelAnimationFrame(scrollSyncFrameRef.current)
+        scrollSyncFrameRef.current = null
+      }
+      if (scrollRestoreFrameRef.current) {
+        window.cancelAnimationFrame(scrollRestoreFrameRef.current)
+        scrollRestoreFrameRef.current = null
+      }
       editorRef.current?.destroy()
       editorRef.current = null
       savedDocRef.current = null
@@ -323,6 +363,33 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
     // 稳定 closure，不应触发 remount；initialValue 仅用于初始挂载。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId, reloadRevision])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    lastReportedScrollTopRef.current = Math.round(initialScrollTop)
+
+    const onScroll = () => {
+      if (scrollSyncFrameRef.current !== null) return
+      scrollSyncFrameRef.current = window.requestAnimationFrame(() => {
+        scrollSyncFrameRef.current = null
+        const next = Math.round(el.scrollTop)
+        if (next === lastReportedScrollTopRef.current) return
+        lastReportedScrollTopRef.current = next
+        onScrollTopChangeRef.current(next)
+      })
+    }
+
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      if (scrollSyncFrameRef.current) {
+        window.cancelAnimationFrame(scrollSyncFrameRef.current)
+        scrollSyncFrameRef.current = null
+      }
+    }
+  }, [tabId])
 
   // ─── 外部 "已保存" signal → 更新 savedDoc，dirty 重置 ────
   useEffect(() => {
@@ -487,6 +554,7 @@ function insertImageAtCursor(
  */
 function applyMerged(
   editor: MilkdownEditor | null,
+  container: HTMLElement | null,
   md: string,
   onHighlight: (ranges: MergeHighlightRange[]) => void,
 ): void {
@@ -499,6 +567,9 @@ function applyMerged(
       if (!newDoc) return
 
       const oldCursor = view.state.selection.head
+      const viewportAnchor = container
+        ? captureViewportAnchor(view, container)
+        : null
       const changes = computeDocDiff(view.state.doc, newDoc)
       if (changes.length === 0) return // no-op
 
@@ -533,9 +604,109 @@ function applyMerged(
       tr = closeHistory(tr)
 
       view.dispatch(tr)
+      if (container && viewportAnchor) {
+        restoreViewportAnchor(view, container, tr.mapping, viewportAnchor)
+        window.requestAnimationFrame(() => {
+          restoreViewportAnchor(view, container, tr.mapping, viewportAnchor)
+        })
+      }
       onHighlight(highlightRanges)
     })
   } catch (e) {
     console.warn('applyMerged failed:', e)
   }
+}
+
+type ViewportAnchor = {
+  pos: number
+  offsetTop: number
+}
+
+function captureViewportAnchor(
+  view: ProseMirrorView,
+  container: HTMLElement,
+): ViewportAnchor | null {
+  const root = view.dom
+  if (!(root instanceof HTMLElement)) return null
+
+  const containerTop = container.getBoundingClientRect().top
+  const blocks = Array.from(root.children).filter(
+    (node): node is HTMLElement => node instanceof HTMLElement,
+  )
+
+  for (const block of blocks) {
+    const rect = block.getBoundingClientRect()
+    if (rect.bottom <= containerTop + 6) continue
+    try {
+      return {
+        pos: view.posAtDOM(block, 0),
+        offsetTop: rect.top - containerTop,
+      }
+    } catch {
+      return null
+    }
+  }
+
+  return null
+}
+
+function restoreViewportAnchor(
+  view: ProseMirrorView,
+  container: HTMLElement,
+  mapping: Mapping,
+  anchor: ViewportAnchor,
+): void {
+  const targetPos = Math.max(
+    0,
+    Math.min(mapping.map(anchor.pos, 1), view.state.doc.content.size),
+  )
+  const block = resolveViewportBlock(view, targetPos)
+  if (!block) return
+
+  const containerTop = container.getBoundingClientRect().top
+  const currentOffset = block.getBoundingClientRect().top - containerTop
+  const nextScrollTop = Math.max(
+    0,
+    container.scrollTop + currentOffset - anchor.offsetTop,
+  )
+  if (Number.isFinite(nextScrollTop)) container.scrollTop = nextScrollTop
+}
+
+function resolveViewportBlock(
+  view: ProseMirrorView,
+  pos: number,
+): HTMLElement | null {
+  const root = view.dom
+  if (!(root instanceof HTMLElement)) return null
+
+  try {
+    const { node, offset } = view.domAtPos(pos)
+    let current: Node | null =
+      node.nodeType === Node.TEXT_NODE ? node.parentNode : node
+    if (current === root) {
+      current =
+        root.children[Math.min(offset, root.children.length - 1)] ??
+        root.lastElementChild
+    }
+    while (current && current.parentNode !== root) {
+      current = current.parentNode
+    }
+    if (current instanceof HTMLElement) return current
+  } catch {
+    /* fallback below */
+  }
+
+  let fallback: HTMLElement | null = null
+  const children = Array.from(root.children).filter(
+    (node): node is HTMLElement => node instanceof HTMLElement,
+  )
+  for (const child of children) {
+    try {
+      if (view.posAtDOM(child, 0) > pos) break
+      fallback = child
+    } catch {
+      /* ignore bad node and keep scanning */
+    }
+  }
+  return fallback ?? (root.lastElementChild as HTMLElement | null)
 }
