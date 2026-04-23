@@ -8,7 +8,6 @@ import { useSettings } from '../store/settings'
 type Props = {
   pane: Pane
   paneIndex: number
-  active: boolean
   /** Zen 模式：隐藏 TabBar / StatusBar / frontmatter strip，只留正文 */
   zen: boolean
   /** 注册 editor handle 给 App（菜单 undo/redo / 拖拽插图用）*/
@@ -20,7 +19,7 @@ type Props = {
  * 跟 App 是"组合 vs 组件"关系——App 管 pane 布局（单栏/分栏），PaneView 管
  * 单 pane 内部。
  */
-export function PaneView({ pane, paneIndex, active, zen, onEditorRef }: Props) {
+export function PaneView({ pane, paneIndex, zen, onEditorRef }: Props) {
   const updateContent = useWorkspace((s) => s.updateContent)
   const setDirty = useWorkspace((s) => s.setDirty)
   const fontFamily = useSettings((s) => s.fontFamily)
@@ -42,7 +41,6 @@ export function PaneView({ pane, paneIndex, active, zen, onEditorRef }: Props) {
   return (
     <div
       data-pane-index={paneIndex}
-      data-print-active={active ? 'true' : 'false'}
       className="ink-pane h-full flex flex-col overflow-hidden"
     >
       {!zen && <TabBar paneIndex={paneIndex} />}

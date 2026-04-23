@@ -19,7 +19,6 @@ export const inkKeymapOverrides = $prose(() =>
     'Mod-o': () => true,
     'Mod-n': () => true,
     'Mod-t': () => true,
-    'Mod-p': () => true,
     'Mod-w': () => true,
     'Mod-s': () => true,
     'Mod-Shift-s': () => true,

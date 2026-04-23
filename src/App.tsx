@@ -69,7 +69,6 @@ function App() {
   // openPath 每次 render 是新 reference；用 ref 让 Tauri listener effect 能
   // 只挂一次（deps=[]）而访问最新的 openPath——避免 listener 累加 pitfall
   const openPathRef = useRef(openPath)
-  const lastPrintAtRef = useRef(0)
   useEffect(() => {
     openPathRef.current = openPath
   }, [openPath])
@@ -114,30 +113,6 @@ function App() {
   const noContent =
     panes.length === 0 || (panes.length === 1 && panes[0].tabs.length === 0)
 
-  const exportPdf = async () => {
-    const now = Date.now()
-    if (now - lastPrintAtRef.current < 400) return
-    lastPrintAtRef.current = now
-
-    if (!activeTab) {
-      toast.warn('没有可导出的文档')
-      return
-    }
-
-    setSearchOpen(false)
-    setHelpOpen(false)
-    setSettingsOpen(false)
-    setLightbox(null)
-
-    await waitForNextPaint()
-    const ready = await waitForPrintReady(activePaneIndex)
-    if (!ready) {
-      toast.warn('Mermaid 还在加载，等图表渲染好再导出')
-      return
-    }
-    window.print()
-  }
-
   // ─── Hooks 层 · 独立职责 ─────────────────────────────────
   useTheme()
   useDragDrop({ setDragOver, openPathRef, editorHandles })
@@ -176,9 +151,6 @@ function App() {
     'Cmd+t': () => newEmptyTab(),
     'Cmd+s': () => {
       if (activeTab) saveTab(activeTab.id)
-    },
-    'Cmd+p': () => {
-      void exportPdf()
     },
     'Cmd+w': () => {
       if (activeTab) requestCloseTab(activeTab.id)
@@ -407,9 +379,6 @@ function App() {
           case 'file.save_as':
             if (activeTab) saveTab(activeTab.id)
             break
-          case 'file.export_pdf':
-            void exportPdf()
-            break
           case 'file.close_tab':
             if (activeTab) requestCloseTab(activeTab.id)
             break
@@ -437,7 +406,7 @@ function App() {
     return () => {
       if (unlisten) unlisten()
     }
-  }, [activeTab, activePaneIndex, exportPdf, openFileDialog, newEmptyTab, saveTab, requestCloseTab, splitRight, toggleToc])
+  }, [activeTab, activePaneIndex, openFileDialog, newEmptyTab, saveTab, requestCloseTab, splitRight, toggleToc])
 
   // TOC 只在有 active tab 且 visible 时显示
   const showToc = tocVisible && activeTab !== null
@@ -512,7 +481,6 @@ function App() {
               <PaneView
                 pane={panes[0]}
                 paneIndex={0}
-                active
                 zen={zenMode}
                 onEditorRef={registerEditorHandle}
               />
@@ -522,7 +490,6 @@ function App() {
                   <PaneView
                     pane={panes[0]}
                     paneIndex={0}
-                    active={activePaneIndex === 0}
                     zen={zenMode}
                     onEditorRef={registerEditorHandle}
                   />
@@ -532,7 +499,6 @@ function App() {
                   <PaneView
                     pane={panes[1]}
                     paneIndex={1}
-                    active={activePaneIndex === 1}
                     zen={zenMode}
                     onEditorRef={registerEditorHandle}
                   />
@@ -695,24 +661,3 @@ function App() {
 }
 
 export default App
-
-async function waitForNextPaint(): Promise<void> {
-  await new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => resolve())
-    })
-  })
-}
-
-async function waitForPrintReady(paneIndex: number): Promise<boolean> {
-  const deadline = Date.now() + 5000
-  while (
-    document.querySelector(
-      `[data-pane-index="${paneIndex}"] .ink-fidelity-loading`,
-    )
-  ) {
-    if (Date.now() >= deadline) return false
-    await new Promise((resolve) => window.setTimeout(resolve, 50))
-  }
-  return true
-}
