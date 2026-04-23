@@ -4,6 +4,25 @@ import react from "@vitejs/plugin-react";
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
+function manualChunks(id: string) {
+  if (!id.includes("/node_modules/")) return;
+  if (id.includes("/node_modules/mermaid/")) return;
+
+  if (
+    id.includes("/node_modules/react/") ||
+    id.includes("/node_modules/react-dom/") ||
+    id.includes("/node_modules/scheduler/")
+  ) {
+    return "react-vendor";
+  }
+
+  if (id.includes("/node_modules/katex/")) {
+    return "katex-vendor";
+  }
+
+  return "vendor";
+}
+
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [react()],
@@ -27,6 +46,13 @@ export default defineConfig(async () => ({
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks,
+      },
     },
   },
 }));

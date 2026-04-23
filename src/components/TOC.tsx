@@ -134,7 +134,7 @@ export function TOC({ markdown, activeIndex, onNavigate, onClose }: Props) {
   }, [headings])
 
   return (
-    <aside className="w-60 h-full border-r border-[color:var(--ink-border)] bg-[color:var(--ink-bg)] flex flex-col select-none">
+    <aside className="ink-toc w-60 h-full border-r border-[color:var(--ink-border)] bg-[color:var(--ink-bg)] flex flex-col select-none">
       <div className="h-9 flex items-center justify-between pl-3 pr-1 text-xs text-[color:var(--ink-muted)] border-b border-[color:var(--ink-border)]">
         <span>大纲</span>
         <div className="flex items-center gap-0.5">

@@ -61,7 +61,7 @@ export function TabBar({ paneIndex }: Props) {
   return (
     <div
       onClick={() => setActivePane(paneIndex)}
-      className={`h-9 flex items-stretch border-b select-none overflow-x-auto transition-colors ${
+      className={`ink-tabbar h-9 flex items-stretch border-b select-none overflow-x-auto transition-colors ${
         paneActive
           ? 'border-[color:var(--ink-border)] bg-[color:var(--ink-bg)]'
           : 'border-[color:var(--ink-border)] bg-[color:var(--ink-bg)]/60'

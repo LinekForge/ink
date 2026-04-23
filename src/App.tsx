@@ -69,6 +69,7 @@ function App() {
   // openPath 每次 render 是新 reference；用 ref 让 Tauri listener effect 能
   // 只挂一次（deps=[]）而访问最新的 openPath——避免 listener 累加 pitfall
   const openPathRef = useRef(openPath)
+  const lastPrintAtRef = useRef(0)
   useEffect(() => {
     openPathRef.current = openPath
   }, [openPath])
@@ -113,6 +114,30 @@ function App() {
   const noContent =
     panes.length === 0 || (panes.length === 1 && panes[0].tabs.length === 0)
 
+  const exportPdf = async () => {
+    const now = Date.now()
+    if (now - lastPrintAtRef.current < 400) return
+    lastPrintAtRef.current = now
+
+    if (!activeTab) {
+      toast.warn('没有可导出的文档')
+      return
+    }
+
+    setSearchOpen(false)
+    setHelpOpen(false)
+    setSettingsOpen(false)
+    setLightbox(null)
+
+    await waitForNextPaint()
+    const ready = await waitForPrintReady(activePaneIndex)
+    if (!ready) {
+      toast.warn('Mermaid 还在加载，等图表渲染好再导出')
+      return
+    }
+    window.print()
+  }
+
   // ─── Hooks 层 · 独立职责 ─────────────────────────────────
   useTheme()
   useDragDrop({ setDragOver, openPathRef, editorHandles })
@@ -151,6 +176,9 @@ function App() {
     'Cmd+t': () => newEmptyTab(),
     'Cmd+s': () => {
       if (activeTab) saveTab(activeTab.id)
+    },
+    'Cmd+p': () => {
+      void exportPdf()
     },
     'Cmd+w': () => {
       if (activeTab) requestCloseTab(activeTab.id)
@@ -379,6 +407,9 @@ function App() {
           case 'file.save_as':
             if (activeTab) saveTab(activeTab.id)
             break
+          case 'file.export_pdf':
+            void exportPdf()
+            break
           case 'file.close_tab':
             if (activeTab) requestCloseTab(activeTab.id)
             break
@@ -406,16 +437,17 @@ function App() {
     return () => {
       if (unlisten) unlisten()
     }
-  }, [activeTab, activePaneIndex, openFileDialog, newEmptyTab, saveTab, requestCloseTab, splitRight, toggleToc])
+  }, [activeTab, activePaneIndex, exportPdf, openFileDialog, newEmptyTab, saveTab, requestCloseTab, splitRight, toggleToc])
 
   // TOC 只在有 active tab 且 visible 时显示
   const showToc = tocVisible && activeTab !== null
 
   return (
     <MilkdownProvider>
-      <div className="flex flex-col h-full w-full relative">
+      <div className="ink-app-shell flex flex-col h-full w-full relative">
         {/* Titlebar —— zen 模式隐藏。单击 startDragging，双击 maximize */}
         {!zenMode && <div
+          className="ink-titlebar h-10 flex items-center pl-20 pr-4 text-xs text-[color:var(--ink-muted)] select-none"
           onMouseDown={async (e) => {
             if (e.button !== 0) return
             const target = e.target as HTMLElement
@@ -431,7 +463,6 @@ function App() {
               await getCurrentWindow().startDragging()
             }
           }}
-          className="h-10 flex items-center pl-20 pr-4 text-xs text-[color:var(--ink-muted)] select-none"
         >
           <span className="truncate flex-1 flex items-center gap-1.5">
             {activeTab ? (
@@ -481,6 +512,7 @@ function App() {
               <PaneView
                 pane={panes[0]}
                 paneIndex={0}
+                active
                 zen={zenMode}
                 onEditorRef={registerEditorHandle}
               />
@@ -490,15 +522,17 @@ function App() {
                   <PaneView
                     pane={panes[0]}
                     paneIndex={0}
+                    active={activePaneIndex === 0}
                     zen={zenMode}
                     onEditorRef={registerEditorHandle}
                   />
                 </Panel>
-                <PanelResizeHandle className="w-px bg-[color:var(--ink-border)] hover:bg-[color:var(--ink-accent)] transition-colors cursor-col-resize" />
+                <PanelResizeHandle className="ink-pane-divider w-px bg-[color:var(--ink-border)] hover:bg-[color:var(--ink-accent)] transition-colors cursor-col-resize" />
                 <Panel defaultSize={50} minSize={25}>
                   <PaneView
                     pane={panes[1]}
                     paneIndex={1}
+                    active={activePaneIndex === 1}
                     zen={zenMode}
                     onEditorRef={registerEditorHandle}
                   />
@@ -508,154 +542,177 @@ function App() {
           </div>
         </div>
 
-        {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
-        {searchOpen && (
-          <SearchBar
-            getHandle={() => editorHandles.current.get(activePaneIndex)}
-            onClose={() => setSearchOpen(false)}
-          />
-        )}
-        {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
+        <div className="ink-overlay-layer">
+          {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
+          {searchOpen && (
+            <SearchBar
+              getHandle={() => editorHandles.current.get(activePaneIndex)}
+              onClose={() => setSearchOpen(false)}
+            />
+          )}
+          {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
 
-        {confirmClose && (
-          <UnsavedPrompt
-            title={confirmClose.title}
-            onSave={async () => {
-              const tabId = confirmClose.tabId
-              await saveTab(tabId)
-              const still = useWorkspace
-                .getState()
-                .panes.flatMap((p) => p.tabs)
-                .find((t) => t.id === tabId)
-              if (still && !still.dirty) {
-                confirmAndCloseTab()
-              } else {
-                cancelCloseConfirm()
-              }
-            }}
-            onDiscard={() => {
-              // discard = 明确丢弃未保存改动 · 连带清 backup（否则下次启动还会 prompt 恢复）
-              const tab = useWorkspace
-                .getState()
-                .panes.flatMap((p) => p.tabs)
-                .find((t) => t.id === confirmClose.tabId)
-              if (tab) {
-                invoke('delete_backup', {
-                  path: tab.path ?? `untitled:${tab.id}`,
-                }).catch(() => {})
-              }
-              confirmAndCloseTab()
-            }}
-            onCancel={cancelCloseConfirm}
-          />
-        )}
-
-        {backupsToRestore && (
-          <BackupRestorePrompt
-            backups={backupsToRestore}
-            onRestoreAll={async () => {
-              const backups = backupsToRestore
-              setBackupsToRestore(null)
-              const ws = useWorkspace.getState()
-              for (const b of backups) {
-                if (b.path.startsWith('untitled:')) {
-                  // Untitled · 新开空 tab + 灌 backup 内容 + 标 dirty
-                  ws.newEmptyTab()
-                  const state = useWorkspace.getState()
-                  const pane = state.panes[state.activePaneIndex]
-                  const newTab = pane.tabs[pane.tabs.length - 1]
-                  if (newTab) {
-                    ws.loadRestoredBackup(newTab.id, b.content)
-                  }
-                  // 旧 backup key（untitled:oldid）在新 tab ⌘S 或 close 时会清
-                  // 这里立刻清掉以免下次启动重复弹
-                  invoke('delete_backup', { path: b.path }).catch(() => {})
-                } else {
-                  // 有 path · openPath → loadRestoredBackup 覆盖成 backup 内容
-                  await openPath(b.path)
-                  const state = useWorkspace.getState()
-                  const opened = state.panes
-                    .flatMap((p) => p.tabs)
-                    .find((t) => t.path === b.path)
-                  if (opened) {
-                    ws.loadRestoredBackup(opened.id, b.content)
-                  }
-                }
-              }
-            }}
-            onDiscardAll={() => {
-              const backups = backupsToRestore
-              setBackupsToRestore(null)
-              for (const b of backups) {
-                invoke('delete_backup', { path: b.path }).catch(() => {})
-              }
-            }}
-          />
-        )}
-
-        {windowClose && (() => {
-          const ws = useWorkspace.getState()
-          const dirty = ws.panes
-            .flatMap((p) => p.tabs)
-            .filter((t) => windowClose.dirtyIds.includes(t.id))
-          const title =
-            dirty.length === 1
-              ? dirty[0].title
-              : `${dirty.length} 个未保存的文件`
-          const message =
-            dirty.length === 1
-              ? undefined
-              : `有 ${dirty.length} 个文件未保存：${dirty.map((t) => t.title).join('、')}。关闭前要保存吗？`
-          return (
+          {confirmClose && (
             <UnsavedPrompt
-              title={title}
-              message={message}
+              title={confirmClose.title}
               onSave={async () => {
-                for (const t of dirty) {
-                  await saveTab(t.id)
-                }
+                const tabId = confirmClose.tabId
+                await saveTab(tabId)
                 const still = useWorkspace
                   .getState()
                   .panes.flatMap((p) => p.tabs)
-                  .filter((t) => t.dirty)
-                if (still.length === 0) {
-                  setWindowClose(null)
-                  await getCurrentWindow().destroy()
+                  .find((t) => t.id === tabId)
+                if (still && !still.dirty) {
+                  confirmAndCloseTab()
                 } else {
-                  setWindowClose({ dirtyIds: still.map((t) => t.id) })
+                  cancelCloseConfirm()
                 }
               }}
-              onDiscard={async () => {
-                // 关窗口时 discard 所有 dirty tab · 连带清它们的 backup
-                for (const t of dirty) {
+              onDiscard={() => {
+                // discard = 明确丢弃未保存改动 · 连带清 backup（否则下次启动还会 prompt 恢复）
+                const tab = useWorkspace
+                  .getState()
+                  .panes.flatMap((p) => p.tabs)
+                  .find((t) => t.id === confirmClose.tabId)
+                if (tab) {
                   invoke('delete_backup', {
-                    path: t.path ?? `untitled:${t.id}`,
+                    path: tab.path ?? `untitled:${tab.id}`,
                   }).catch(() => {})
                 }
-                setWindowClose(null)
-                await getCurrentWindow().destroy()
+                confirmAndCloseTab()
               }}
-              onCancel={() => setWindowClose(null)}
+              onCancel={cancelCloseConfirm}
             />
-          )
-        })()}
-        {dragOver && (
-          <div
-            className="ink-drop-zone pointer-events-none absolute inset-0 z-30 bg-[color:var(--ink-accent)]/[0.06] ring-1 ring-inset ring-[color:var(--ink-accent)]/25"
-            aria-hidden
-          />
-        )}
-        {lightbox && (
-          <Lightbox
-            src={lightbox.src}
-            alt={lightbox.alt}
-            onClose={() => setLightbox(null)}
-          />
-        )}
-        <Toasts />
+          )}
+
+          {backupsToRestore && (
+            <BackupRestorePrompt
+              backups={backupsToRestore}
+              onRestoreAll={async () => {
+                const backups = backupsToRestore
+                setBackupsToRestore(null)
+                const ws = useWorkspace.getState()
+                for (const b of backups) {
+                  if (b.path.startsWith('untitled:')) {
+                    // Untitled · 新开空 tab + 灌 backup 内容 + 标 dirty
+                    ws.newEmptyTab()
+                    const state = useWorkspace.getState()
+                    const pane = state.panes[state.activePaneIndex]
+                    const newTab = pane.tabs[pane.tabs.length - 1]
+                    if (newTab) {
+                      ws.loadRestoredBackup(newTab.id, b.content)
+                    }
+                    // 旧 backup key（untitled:oldid）在新 tab ⌘S 或 close 时会清
+                    // 这里立刻清掉以免下次启动重复弹
+                    invoke('delete_backup', { path: b.path }).catch(() => {})
+                  } else {
+                    // 有 path · openPath → loadRestoredBackup 覆盖成 backup 内容
+                    await openPath(b.path)
+                    const state = useWorkspace.getState()
+                    const opened = state.panes
+                      .flatMap((p) => p.tabs)
+                      .find((t) => t.path === b.path)
+                    if (opened) {
+                      ws.loadRestoredBackup(opened.id, b.content)
+                    }
+                  }
+                }
+              }}
+              onDiscardAll={() => {
+                const backups = backupsToRestore
+                setBackupsToRestore(null)
+                for (const b of backups) {
+                  invoke('delete_backup', { path: b.path }).catch(() => {})
+                }
+              }}
+            />
+          )}
+
+          {windowClose && (() => {
+            const ws = useWorkspace.getState()
+            const dirty = ws.panes
+              .flatMap((p) => p.tabs)
+              .filter((t) => windowClose.dirtyIds.includes(t.id))
+            const title =
+              dirty.length === 1
+                ? dirty[0].title
+                : `${dirty.length} 个未保存的文件`
+            const message =
+              dirty.length === 1
+                ? undefined
+                : `有 ${dirty.length} 个文件未保存：${dirty.map((t) => t.title).join('、')}。关闭前要保存吗？`
+            return (
+              <UnsavedPrompt
+                title={title}
+                message={message}
+                onSave={async () => {
+                  for (const t of dirty) {
+                    await saveTab(t.id)
+                  }
+                  const still = useWorkspace
+                    .getState()
+                    .panes.flatMap((p) => p.tabs)
+                    .filter((t) => t.dirty)
+                  if (still.length === 0) {
+                    setWindowClose(null)
+                    await getCurrentWindow().destroy()
+                  } else {
+                    setWindowClose({ dirtyIds: still.map((t) => t.id) })
+                  }
+                }}
+                onDiscard={async () => {
+                  // 关窗口时 discard 所有 dirty tab · 连带清它们的 backup
+                  for (const t of dirty) {
+                    invoke('delete_backup', {
+                      path: t.path ?? `untitled:${t.id}`,
+                    }).catch(() => {})
+                  }
+                  setWindowClose(null)
+                  await getCurrentWindow().destroy()
+                }}
+                onCancel={() => setWindowClose(null)}
+              />
+            )
+          })()}
+          {dragOver && (
+            <div
+              className="ink-drop-zone pointer-events-none absolute inset-0 z-30 bg-[color:var(--ink-accent)]/[0.06] ring-1 ring-inset ring-[color:var(--ink-accent)]/25"
+              aria-hidden
+            />
+          )}
+          {lightbox && (
+            <Lightbox
+              src={lightbox.src}
+              alt={lightbox.alt}
+              onClose={() => setLightbox(null)}
+            />
+          )}
+          <Toasts />
+        </div>
       </div>
     </MilkdownProvider>
   )
 }
 
 export default App
+
+async function waitForNextPaint(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => resolve())
+    })
+  })
+}
+
+async function waitForPrintReady(paneIndex: number): Promise<boolean> {
+  const deadline = Date.now() + 5000
+  while (
+    document.querySelector(
+      `[data-pane-index="${paneIndex}"] .ink-fidelity-loading`,
+    )
+  ) {
+    if (Date.now() >= deadline) return false
+    await new Promise((resolve) => window.setTimeout(resolve, 50))
+  }
+  return true
+}

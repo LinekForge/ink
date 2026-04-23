@@ -8,7 +8,6 @@ import type {
   EditorView,
   NodeView,
 } from '@milkdown/prose/view'
-import mermaid from 'mermaid'
 import {
   buildMermaidConfig,
   getResolvedInkTheme,
@@ -16,7 +15,11 @@ import {
   readInkPalette,
 } from '../lib/fidelity'
 
+type MermaidApi = (typeof import('mermaid'))['default']
+
 let mermaidQueue: Promise<void> = Promise.resolve()
+let mermaidModule: MermaidApi | null = null
+let mermaidModulePromise: Promise<MermaidApi> | null = null
 
 function queueMermaidRender<T>(task: () => Promise<T>): Promise<T> {
   const run = mermaidQueue.then(task, task)
@@ -25,6 +28,26 @@ function queueMermaidRender<T>(task: () => Promise<T>): Promise<T> {
     () => undefined,
   )
   return run
+}
+
+function hasLoadedMermaid(): boolean {
+  return mermaidModule !== null
+}
+
+async function loadMermaid(): Promise<MermaidApi> {
+  if (mermaidModule) return mermaidModule
+  if (!mermaidModulePromise) {
+    mermaidModulePromise = import('mermaid')
+      .then((mod) => {
+        mermaidModule = mod.default
+        return mermaidModule
+      })
+      .catch((error) => {
+        mermaidModulePromise = null
+        throw error
+      })
+  }
+  return mermaidModulePromise
 }
 
 function renderMathPreview(
@@ -59,13 +82,18 @@ async function renderMermaidPreview(
   renderToken: number,
   getToken: () => number,
 ): Promise<void> {
-  target.innerHTML = ''
   target.classList.remove('ink-fidelity-fallback')
+  if (!hasLoadedMermaid()) {
+    target.replaceChildren(
+      createLoadingDom('正在加载 Mermaid…', '首次遇到图表时按需载入'),
+    )
+  }
   try {
     const theme = getResolvedInkTheme()
     const palette = readInkPalette()
     const fontFamily =
       getComputedStyle(document.body).fontFamily || 'ui-serif, serif'
+    const mermaid = await loadMermaid()
 
     const result = await Promise.race([
       queueMermaidRender(async () => {
@@ -116,6 +144,25 @@ function createFallbackDom(
   pre.textContent = source
 
   wrap.append(heading, detail, pre)
+  return wrap
+}
+
+function createLoadingDom(title: string, detailText: string): HTMLElement {
+  const wrap = document.createElement('div')
+  wrap.className = 'ink-fidelity-loading'
+
+  const heading = document.createElement('div')
+  heading.className = 'ink-fidelity-loading-title'
+  heading.textContent = title
+
+  const detail = document.createElement('div')
+  detail.className = 'ink-fidelity-loading-detail'
+  detail.textContent = detailText
+
+  const bar = document.createElement('div')
+  bar.className = 'ink-fidelity-loading-bar'
+
+  wrap.append(heading, detail, bar)
   return wrap
 }
 

@@ -80,7 +80,7 @@ export function StatusBar({ tabId, content, dirty }: Props) {
   }
 
   return (
-    <div className="relative h-6 px-4 flex items-center justify-between gap-3 text-[11px] text-[color:var(--ink-muted)] select-none border-t border-[color:var(--ink-border)] bg-[color:var(--ink-bg)]">
+    <div className="ink-statusbar relative h-6 px-4 flex items-center justify-between gap-3 text-[11px] text-[color:var(--ink-muted)] select-none border-t border-[color:var(--ink-border)] bg-[color:var(--ink-bg)]">
       {/* ─── 左：历史 icon + 当前回执 ─── */}
       <div className="flex-1 min-w-0 flex items-center gap-2">
         <button

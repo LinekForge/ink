@@ -283,6 +283,50 @@ body {
   margin: 0 auto;
 }
 
+.milkdown-host .ProseMirror .ink-fidelity-loading {
+  display: grid;
+  gap: 8px;
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-loading-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-fg);
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-loading-detail {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+@keyframes ink-fidelity-loading-sheen {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-loading-bar {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink-border) 55%, transparent);
+}
+
+.milkdown-host .ProseMirror .ink-fidelity-loading-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 34%;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--ink-accent) 65%, transparent);
+  animation: ink-fidelity-loading-sheen 1.05s ease-in-out infinite;
+}
+
 .milkdown-host .ProseMirror .ink-fidelity-error {
   display: grid;
   gap: 8px;
@@ -364,6 +408,120 @@ body {
 .milkdown-host .ProseMirror .ink-merge-highlight {
   animation: ink-merge-highlight-fade 2800ms ease-out forwards;
   border-radius: 3px;
+}
+
+@media print {
+  html,
+  body,
+  #root,
+  .ink-app-shell {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  body {
+    color: #111827 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .ink-titlebar,
+  .ink-toc,
+  .ink-tabbar,
+  .ink-statusbar,
+  .ink-frontmatter-strip,
+  .ink-pane-divider,
+  .ink-overlay-layer,
+  .ink-pane[data-print-active='false'] {
+    display: none !important;
+  }
+
+  .ink-pane,
+  .ink-pane-body,
+  .ink-document-shell,
+  .ink-editor-surface,
+  .ink-editor-surface .milkdown,
+  .ink-editor-surface .ProseMirror {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .ink-pane {
+    display: block !important;
+  }
+
+  .ink-pane-body,
+  .ink-document-shell {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .ink-document-shell {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .ink-editor-surface .ProseMirror {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  .ink-editor-surface .ProseMirror > * {
+    max-width: none !important;
+  }
+
+  .ink-editor-surface .ProseMirror > pre {
+    width: auto !important;
+    max-width: none !important;
+    overflow: visible !important;
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere;
+  }
+
+  .ink-editor-surface .ProseMirror > h1,
+  .ink-editor-surface .ProseMirror > h2,
+  .ink-editor-surface .ProseMirror > h3,
+  .ink-editor-surface .ProseMirror > h4,
+  .ink-editor-surface .ProseMirror > h5,
+  .ink-editor-surface .ProseMirror > h6 {
+    break-after: avoid-page;
+    page-break-after: avoid;
+  }
+
+  .ink-editor-surface .ProseMirror > pre,
+  .ink-editor-surface .ProseMirror > table,
+  .ink-editor-surface .ProseMirror > figure,
+  .ink-editor-surface .ProseMirror > blockquote,
+  .ink-editor-surface .ProseMirror > .ink-fidelity-block {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+
+  .ink-editor-surface .ProseMirror .ink-fidelity-editor,
+  .ink-editor-surface .ProseMirror .ink-fidelity-inline-editor {
+    display: none !important;
+  }
+
+  .ink-editor-surface .ProseMirror .ink-fidelity-preview[hidden] {
+    display: block !important;
+  }
+
+  .ink-editor-surface .ProseMirror .ink-fidelity-inline-preview[hidden] {
+    display: inline-flex !important;
+  }
+
+  .ink-editor-surface .ProseMirror .ink-fidelity-mermaid-preview,
+  .ink-editor-surface .ProseMirror .ink-fidelity-math-preview {
+    overflow: visible !important;
+  }
+
+  .ink-editor-surface .ProseMirror img,
+  .ink-editor-surface .ProseMirror svg {
+    max-width: 100% !important;
+    height: auto !important;
+  }
 }
 
 /* Heading · 六级视觉阶梯（2 / 1.5 / 1.25 / 1.05 / 0.95 + letter-spacing / 0.85 uppercase muted） */

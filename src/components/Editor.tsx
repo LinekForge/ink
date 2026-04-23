@@ -413,7 +413,7 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
       // min-w-0：破 flex child 默认 min-width: auto，允许按父宽收缩
       // overflow-x-hidden：显式写，阻止 CSS spec 把 overflow-x: visible
       // 自动升级成 auto（= 消除"整个 editor 出现水平滚动条"的根因）
-      className="milkdown-host flex-1 min-w-0 overflow-y-auto overflow-x-hidden"
+      className="ink-editor-surface milkdown-host flex-1 min-w-0 overflow-y-auto overflow-x-hidden"
     />
   )
 })

@@ -433,6 +433,11 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Men
                 .accelerator("Cmd+Shift+S")
                 .build(app)?,
         )
+        .item(
+            &MenuItemBuilder::with_id("file.export_pdf", "导出 PDF")
+                .accelerator("Cmd+P")
+                .build(app)?,
+        )
         .separator()
         .item(
             &MenuItemBuilder::with_id("file.close_tab", "关闭页签")
