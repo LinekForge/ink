@@ -192,6 +192,10 @@ body {
   border-top: 1px solid var(--ink-border);
   background: color-mix(in srgb, var(--ink-bg) 72%, var(--ink-code-bg));
 }
+.milkdown-host .ProseMirror .ink-fidelity-editor[hidden],
+.milkdown-host .ProseMirror .ink-fidelity-inline-editor[hidden] {
+  display: none;
+}
 
 .milkdown-host .ProseMirror .ink-fidelity-label {
   margin-bottom: 8px;
