@@ -1,6 +1,6 @@
 [package]
 name = "ink"
-version = "0.3.0"
+version = "0.3.5"
 description = "墨 · A minimal, elegant Markdown reader & light editor"
 authors = ["Linek & Forge"]
 license = "MIT"
