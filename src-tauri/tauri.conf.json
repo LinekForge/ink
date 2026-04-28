@@ -28,13 +28,13 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["$HOME/**", "/Volumes/**", "/tmp/**"]
+        "scope": ["$HOME/**", "/Volumes/**", "/tmp/**", "C:\\**", "D:\\**"]
       }
     }
   },
   "bundle": {
     "active": true,
-    "targets": "dmg",
+    "targets": "all",
     "category": "public.app-category.productivity",
     "publisher": "LinekForge",
     "copyright": "© 2026 Linek & Forge",
