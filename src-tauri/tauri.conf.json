@@ -34,7 +34,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["dmg", "nsis"],
     "category": "public.app-category.productivity",
     "publisher": "LinekForge",
     "copyright": "© 2026 Linek & Forge",

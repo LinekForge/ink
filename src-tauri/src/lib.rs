@@ -91,8 +91,7 @@ fn canon_read(path: &str) -> Result<PathBuf, String> {
     if path.is_empty() {
         return Err("empty path".to_string());
     }
-    Path::new(path)
-        .canonicalize()
+    dunce::canonicalize(Path::new(path))
         .map_err(|e| format!("invalid path {}: {}", path, e))
 }
 
@@ -110,8 +109,7 @@ fn canon_write(path: &str) -> Result<PathBuf, String> {
         .parent()
         .filter(|pp| !pp.as_os_str().is_empty())
         .ok_or_else(|| format!("no parent dir in {}", path))?;
-    let canon = parent
-        .canonicalize()
+    let canon = dunce::canonicalize(parent)
         .map_err(|e| format!("invalid parent of {}: {}", path, e))?;
     Ok(canon.join(name))
 }
@@ -181,7 +179,7 @@ fn watch_file(
         // 流程——macOS 上 `mv file` 是 Modify(Name(RenameMode::From))，不是 Remove；
         // 跨卷 mv 是 Create+Remove；直接 rm 是 Remove。路径不存在即视作 missing。
         match event.kind {
-            EventKind::Remove(_) | EventKind::Modify(_) | EventKind::Create(_) => {
+            EventKind::Remove(_) | EventKind::Modify(_) | EventKind::Create(_) | EventKind::Any => {
                 // 先 stat：文件已不存在（rename away / rm / mv 走）→ emit file-removed
                 if !canon_for_callback.exists() {
                     // Rename 事件 event.paths 会含 [from, to]——取 to 给前端显示新位置
