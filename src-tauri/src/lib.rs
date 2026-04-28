@@ -562,9 +562,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    // RunEvent loop —— 处理 macOS 双击 .md（走 Apple Event，不走 argv）
-    app.run(|app_handle, event| {
-        if let tauri::RunEvent::Opened { urls } = event {
+    app.run(|_app_handle, _event| {
+        // macOS: 双击 .md 走 Apple Event → RunEvent::Opened
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Opened { urls } = _event {
             let paths: Vec<String> = urls
                 .into_iter()
                 .filter_map(|u| {
@@ -580,12 +581,10 @@ pub fn run() {
                 .collect();
 
             if !paths.is_empty() {
-                // 1) 总是推到 PendingFiles（cold start 时 webview 可能还没 ready）
-                if let Some(state) = app_handle.try_state::<PendingFiles>() {
+                if let Some(state) = _app_handle.try_state::<PendingFiles>() {
                     state.0.lock().unwrap().extend(paths.clone());
                 }
-                // 2) runtime 时把窗口从 Dock 最小化态弹出并 focus，再 emit
-                if let Some(w) = app_handle.get_webview_window("main") {
+                if let Some(w) = _app_handle.get_webview_window("main") {
                     let _ = w.unminimize();
                     let _ = w.show();
                     let _ = w.set_focus();
