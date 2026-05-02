@@ -226,7 +226,14 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     set((s) => ({
       panes: s.panes.map((p) => ({
         ...p,
-        tabs: p.tabs.map((t) => (t.id === id ? { ...t, content } : t)),
+        tabs: p.tabs.map((t) => {
+          if (t.id !== id) return t
+          const next: Tab = { ...t, content }
+          if (!t.dirty) {
+            next.baseContent = joinFrontmatter(t.frontmatter, content)
+          }
+          return next
+        }),
       })),
     })),
 

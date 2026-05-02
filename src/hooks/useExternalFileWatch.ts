@@ -140,14 +140,22 @@ export function useExternalFileWatch({ getHandleForPane }: Params) {
       infoPath: string | undefined
     }) => {
       const { tabId, paneIdx, mergedRaw, theirs, isShownInPane, infoMsg, infoPath } = args
-      if (isShownInPane) {
-        const handle = getHandleForPane(paneIdx)
-        if (handle) {
-          const { body } = splitFrontmatter(mergedRaw)
-          handle.applyMergedMarkdown(body)
+      const handle = isShownInPane ? getHandleForPane(paneIdx) : null
+      if (handle) {
+        const { body } = splitFrontmatter(mergedRaw)
+        handle.applyMergedMarkdown(body)
+      }
+      // baseContent 用 Milkdown serialize 后的 theirs，确保 base 和 ours 格式一致，
+      // 避免 Milkdown 的 parse→serialize round-trip 差异导致下次 diff3 假冲突
+      let normalizedTheirs = theirs
+      if (handle) {
+        const { frontmatter: theirsFm, body: theirsBody } = splitFrontmatter(theirs)
+        const serialized = handle.normalizeMarkdown(theirsBody)
+        if (serialized !== null) {
+          normalizedTheirs = joinFrontmatter(theirsFm, serialized)
         }
       }
-      useWorkspace.getState().applyExternalMerge(tabId, mergedRaw, theirs)
+      useWorkspace.getState().applyExternalMerge(tabId, mergedRaw, normalizedTheirs)
       if (!isShownInPane) useWorkspace.getState().bumpReloadRevision(tabId)
       statusInfo.info(infoMsg, { path: infoPath, passive: true })
     }

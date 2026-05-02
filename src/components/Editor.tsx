@@ -11,6 +11,7 @@ import {
   defaultValueCtx,
   editorViewCtx,
   parserCtx,
+  serializerCtx,
 } from '@milkdown/core'
 // ProseMirror Node 实例——不强 type（transitive dep 不稳）。只用 .eq() runtime 方法
 import { commonmark } from '@milkdown/preset-commonmark'
@@ -101,6 +102,7 @@ export type EditorHandle = {
    *  - 光标用 tr.mapping.map(oldPos) 天然保留（Obsidian review 点）
    *  - closeHistory 让这次 merge 成为独立 undo unit */
   applyMergedMarkdown: (md: string) => void
+  normalizeMarkdown: (md: string) => string | null
 }
 
 /**
@@ -235,6 +237,21 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(
             mergeHighlightTimerRef.current = null
           }, 2800)
         })
+      },
+      normalizeMarkdown: (md) => {
+        if (!editorRef.current) return null
+        try {
+          let result: string | null = null
+          editorRef.current.action((ctx) => {
+            const parser = ctx.get(parserCtx)
+            const serializer = ctx.get(serializerCtx)
+            const doc = parser(md)
+            if (doc) result = serializer(doc)
+          })
+          return result
+        } catch {
+          return null
+        }
       },
     }),
     [],

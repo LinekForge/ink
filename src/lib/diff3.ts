@@ -19,14 +19,29 @@ export type DiffMergeResult = {
  *   theirs 内容
  *   >>>>>>>
  */
+/**
+ * 去掉 Milkdown serialize round-trip 引入的格式噪音（行尾空白、多余空行）。
+ * diff3 在 normalize 后的文本上做，避免格式差异被误判为内容改动导致假冲突。
+ */
+function normalizeForMerge(md: string): string {
+  return md
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+}
+
 export function mergeTexts(
   base: string,
   ours: string,
   theirs: string,
 ): DiffMergeResult {
-  const r = merge(ours, base, theirs, {
-    stringSeparator: /\r?\n/,
-  })
+  const r = merge(
+    normalizeForMerge(ours),
+    normalizeForMerge(base),
+    normalizeForMerge(theirs),
+    { stringSeparator: /\r?\n/ },
+  )
   return {
     conflict: r.conflict,
     merged: r.result.join('\n'),
