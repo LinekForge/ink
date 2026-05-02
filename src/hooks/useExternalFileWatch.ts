@@ -168,10 +168,11 @@ export function useExternalFileWatch({ getHandleForPane }: Params) {
       const isShownInPane = state.panes[paneIdx].activeTabId === tabId
       const infoPath = tab.path ?? undefined
 
-      // Ink 无 dirty（ours === base）：直接采用 theirs
-      // editor 更新后内容 == 磁盘，语义上"已同步" → bump savedRevision 让
-      // Editor 重置 savedDoc，dirty 归零（否则新 doc != 旧 savedDoc 会误判 dirty）
-      if (ours === base) {
+      // Ink 无 dirty：直接采用 theirs
+      // 用 tab.dirty（基于 ProseMirror doc.eq）判断而不是 ours === base 字符串比较——
+      // Milkdown serialize round-trip 可能改变空白/换行，导致字符串不等但 doc tree 等价，
+      // 字符串比较会把这种 serialize 差异误判为"用户编辑了"走进三路合并产生假冲突。
+      if (!tab.dirty) {
         applyAndSync({
           tabId, paneIdx, mergedRaw: theirs, theirs, isShownInPane,
           infoMsg: buildExternalSyncMessage(tab.title, 'synced'), infoPath,
